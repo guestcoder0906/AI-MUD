@@ -246,11 +246,13 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Layout */}
+  // ... (inside return)
+
+      {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden relative">
 
         {/* Main Terminal Area */}
         <main className="flex-1 flex flex-col relative bg-gradient-to-b from-terminal-black to-[#050505]">
-          <LiveTicker updates={gameState.liveUpdates} />
 
           <Terminal
             history={gameState.history}
@@ -259,10 +261,13 @@ const App: React.FC = () => {
             userId={currentUsername}
           />
 
-
+          {/* Live Ticker - Now positioned in bottom right overlay */}
+          <div className="absolute bottom-4 right-4 z-20 max-w-sm pointer-events-none">
+            <LiveTicker updates={gameState.liveUpdates} />
+          </div>
 
           {/* Input Area */}
-          <div className="p-4 bg-terminal-black border-t border-terminal-gray shrink-0">
+          <div className="p-4 bg-terminal-black border-t border-terminal-gray shrink-0 z-30">
             <form onSubmit={onSubmit} className="relative flex items-center">
               <span className="absolute left-3 text-terminal-amber font-bold animate-pulse">{'>'}</span>
               <input
@@ -299,10 +304,17 @@ const App: React.FC = () => {
                 externalSelectedFile={selectedFile}
                 onSelect={setSelectedFile}
                 debugMode={gameState.debugMode}
-                userId={user?.id}
-                players={sessionId ? connectedPlayers : undefined}
-                isHost={isHost}
-                onKick={kickPlayer}
+                currentUserId={currentUsername}
+                PlayerListComponent={
+                  sessionId ? (
+                    <PlayerList
+                      players={connectedPlayers}
+                      currentUserId={user?.id}
+                      isHost={isHost}
+                      onKick={kickPlayer}
+                    />
+                  ) : null
+                }
               />
             </div>
           </aside>

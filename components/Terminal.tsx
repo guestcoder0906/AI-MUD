@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { LogEntry } from '../types';
+import { parseTargetedText } from '../utils/textParser';
 
 interface TerminalProps {
   history: LogEntry[];
@@ -7,6 +8,11 @@ interface TerminalProps {
   onReferenceClick: (ref: string) => void;
   userId?: string;
 }
+
+const LocalMessage: React.FC<{ target: string, content: string, userId?: string, onReferenceClick: (ref: string) => void }> = ({ target, content, userId, onReferenceClick }) => {
+  // Deprecated approach, we now use parseTargetedText for inline parsing
+  return null;
+};
 
 // Helper for reuse
 const processInspectables = (text: string, onClick: (ref: string) => void) => {
@@ -36,14 +42,12 @@ export const Terminal: React.FC<TerminalProps> = ({ history, isLoading, onRefere
   }, [history, isLoading]);
 
   const renderText = (text: string) => {
-    // 1. Filter content based on user ID logic
-    const filteredText = filterContentForUser(text, userId || '', userId || '');
+    // Parse for visibility first
+    const visibleText = parseTargetedText(text, userId || 'Guest');
+    if (!visibleText) return null;
 
-    // 2. Process inspectables in the clean text
-    // If text became empty, we might return null or empty span?
-    if (!filteredText.trim() && text.trim().length > 0) return <span className="text-terminal-gray/20 italic text-[10px]">*silence*</span>;
-
-    return processInspectables(filteredText, onReferenceClick);
+    // Then process inspectables
+    return processInspectables(visibleText, onReferenceClick);
   };
 
   const processInspectables = (text: string, onClick: (ref: string) => void) => {
@@ -61,7 +65,7 @@ export const Terminal: React.FC<TerminalProps> = ({ history, isLoading, onRefere
           </span>
         );
       }
-      return <span key={idx}>{part}</span>;
+      return part;
     });
   };
 

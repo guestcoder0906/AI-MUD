@@ -152,13 +152,11 @@ export const useGameEngine = (user?: any) => {
 
   // ... (previous code)
 
-  // Derive username for file checking - STRICT IDENTITY
-  // Use the same logic as useMultiplayer to ensure consistency
-  const username = user?.user_metadata?.username || user?.id || 'Guest';
+  // Derive username for file checking
+  const username = user?.user_metadata?.username || user?.user_metadata?.full_name || 'Guest';
   const playerFileName = `Player_${username}.txt`;
-
-  // STRICT: Only bind to the specific player file. No fallbacks.
-  const myPlayerFile = gameState.files[playerFileName];
+  // Also check generic Player.txt for backward compatibility or single player default
+  const myPlayerFile = gameState.files[playerFileName] || gameState.files['Player.txt'];
 
   const isPlayerDead =
     myPlayerFile && (

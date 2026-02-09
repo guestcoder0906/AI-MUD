@@ -1,30 +1,17 @@
 import React, { useEffect } from 'react';
 import { FileObject } from '../types';
-import { filterContentForUser } from '../utils/textParsing';
-import { PlayerList } from './PlayerList'; // Import PlayerList
+import { parseTargetedText } from '../utils/textParser';
 
 interface FileSystemProps {
   files: Record<string, FileObject>;
   externalSelectedFile: string | null;
   onSelect: (fileName: string | null) => void;
   debugMode: boolean;
-  userId?: string;
-  // PlayerList Props
-  players?: any[];
-  isHost?: boolean;
-  onKick?: (userId: string) => void;
+  currentUserId?: string;
+  PlayerListComponent?: React.ReactNode; // Slot for PlayerList
 }
 
-export const FileSystem: React.FC<FileSystemProps> = ({
-  files,
-  externalSelectedFile,
-  onSelect,
-  debugMode,
-  userId,
-  players,
-  isHost,
-  onKick
-}) => {
+export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedFile, onSelect, debugMode, currentUserId, PlayerListComponent }) => {
   useEffect(() => {
     if (externalSelectedFile) {
       // Optional: Scroll into view logic
@@ -52,7 +39,7 @@ export const FileSystem: React.FC<FileSystemProps> = ({
   });
 
   return (
-    <div className="h-full flex flex-col bg-terminal-black border-l border-terminal-gray w-full md:w-80">
+    <div className="h-full flex flex-col bg-terminal-black w-full md:w-80 border-l border-terminal-gray relative">
       <div className={`p-3 border-b border-terminal-gray flex justify-between items-center ${debugMode ? 'bg-terminal-dimAmber/30' : 'bg-terminal-dimGreen/20'}`}>
         <h2 className={`${debugMode ? 'text-terminal-amber' : 'text-terminal-green'} text-xs font-bold uppercase tracking-wider flex items-center`}>
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
@@ -84,33 +71,19 @@ export const FileSystem: React.FC<FileSystemProps> = ({
                 {file.content.includes('hide[') && (
                   <div className="absolute top-1 right-1 text-red-500 text-[9px] border border-red-500 px-1 rounded bg-black">HIDDEN LAYERS</div>
                 )}
-                {/* Apply Targeted Messaging Filter to Content */}
-                {filterContentForUser(file.content, userId || '', userId || '')}
+                {parseTargetedText(file.content, currentUserId || 'Guest')}
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* Embedded Player List */}
-      {players && players.length > 0 && (
-        <div className="border-t-2 border-terminal-gray bg-terminal-black p-0 shrink-0">
-          <div className="p-2 border-b border-terminal-gray/50 text-[10px] text-terminal-lightGray uppercase font-bold bg-terminal-gray/10">
-            Active Uplinks
-          </div>
-          {/* We pass styles to strip absolute positioning if needed, OR we modify PlayerList to be flexible */}
-          {/* PlayerList currently has "absolute bottom-4 right-4". We need to modify PlayerList to handle 'embedded' mode or just change its CSS. */}
-          {/* Strategy: Modifying PlayerList.tsx next is better. For now passing props. */}
-          <PlayerList
-            players={players}
-            currentUserId={userId || ''}
-            isHost={!!isHost}
-            onKick={onKick || (() => { })}
-            embedded={true} // New prop to handle styling
-          />
+      {/* Embedded Player List at the bottom of the sidebar */}
+      {PlayerListComponent && (
+        <div className="border-t border-terminal-gray bg-black/50">
+          {PlayerListComponent}
         </div>
       )}
-
     </div>
   );
 };
