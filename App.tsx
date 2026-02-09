@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGameEngine } from './hooks/useGameEngine';
+import { useMultiplayer } from './hooks/useMultiplayer';
 import { Terminal } from './components/Terminal';
 import { FileSystem } from './components/FileSystem';
 import { LiveTicker } from './components/LiveTicker';
-import { AuthProvider } from './contexts/AuthContext';
 import { AuthOverlay } from './components/AuthOverlay';
-import { MultiplayerLobby } from './components/MultiplayerLobby';
 
 const App: React.FC = () => {
+  /* Auth State */
+  const [user, setUser] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  /* Game Engine Hook */
   const {
     gameState,
+    setGameState,
     handleInput,
     resetGame,
     toggleDebug,
@@ -17,9 +22,20 @@ const App: React.FC = () => {
     selectedFile,
     setSelectedFile,
     isPlayerDead,
-    multiplayer
-  } = useGameEngine();
+    isSyncing
+  } = useGameEngine(user);
 
+  /* Multiplayer Hook */
+  const {
+    sessionId,
+    createSession,
+    joinSession,
+    connectedPlayers,
+    broadcastAction,
+    isHost
+  } = useMultiplayer(user, gameState, setGameState, handleInput);
+
+  /* UI State */
   const [inputValue, setInputValue] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(true); // Assume true initially to avoid flicker, check on mount
@@ -61,8 +77,24 @@ const App: React.FC = () => {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleInput(inputValue);
-    setInputValue('');
+    if (!inputValue.trim()) return;
+
+    if (sessionId) {
+      // Multiplayer Mode
+      broadcastAction(inputValue);
+      // We also want to show it locally as "Pending" or just clear input?
+      // For now, let's clear input and maybe add a local log via handleInput if we want validity checking?
+      // But the requirement says "waits for all players to submit".
+      // So we probably shouldn't execute it locally yet.
+      // I'll add a log entry saying "Waiting for others..."
+      // actually `broadcastAction` also calls `handleRemoteAction` for self which adds to pending.
+      // But we need to give feedback.
+      setInputValue('');
+    } else {
+      // Single Player
+      handleInput(inputValue);
+      setInputValue('');
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -74,21 +106,24 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-terminal-black text-terminal-green font-mono flex flex-col overflow-hidden relative selection:bg-terminal-green selection:text-terminal-black">
-      <AuthOverlay />
-      <MultiplayerLobby
-        onCreateRoom={multiplayer.createRoom}
-        onJoinRoom={multiplayer.joinRoom}
-        onKickPlayer={multiplayer.kickPlayer}
-        participants={multiplayer.participants}
-        roomId={multiplayer.roomId}
-        isMultiplayer={multiplayer.isMultiplayer}
-        waitingForTurn={multiplayer.waitingForTurn}
-      />
+
+      {!authChecked && !user && (
+        <AuthOverlay
+          onLogin={(u) => {
+            setUser(u);
+            setAuthChecked(true);
+          }}
+          onGuest={() => {
+            setAuthChecked(true);
+          }}
+        />
+      )}
+
       {/* Header / Status Bar */}
       <header className="h-12 border-b border-terminal-gray bg-terminal-black flex items-center justify-between px-4 z-20 shadow-md shrink-0">
         <div className="flex items-center space-x-4">
-          <div className="text-terminal-amber font-bold tracking-widest">AI-MUD</div>
-          <div className="hidden md:block text-xs text-terminal-lightGray opacity-50">v1.0.0</div>
+          <div className="text-terminal-amber font-bold tracking-widest">OMNISCRIPT</div>
+          <div className="hidden md:block text-xs text-terminal-lightGray opacity-50">v3.1.0-ENGINE</div>
         </div>
 
         <div className="flex items-center space-x-4 md:space-x-6 text-sm">
@@ -99,6 +134,14 @@ const App: React.FC = () => {
             >
               CONNECT KEY
             </button>
+          )}
+
+          {user ? (
+            <div className="text-terminal-green text-xs border border-terminal-green/50 px-2 py-1 rounded bg-terminal-green/10">
+              Logged in as: {user.user_metadata?.username || user.email}
+            </div>
+          ) : (
+            <div className="text-terminal-lightGray text-xs italic">Guest Mode</div>
           )}
 
           <div className="flex items-center space-x-2">
@@ -113,6 +156,36 @@ const App: React.FC = () => {
             {showSidebar ? 'Hide' : 'Files'}
           </button>
 
+          {/* Multiplayer Controls (Authenticated Only) */}
+          {user && (
+            <div className="flex items-center space-x-2 border-l border-terminal-gray pl-4">
+              {!sessionId ? (
+                <>
+                  <button
+                    onClick={createSession}
+                    className="text-xs border border-terminal-green text-terminal-green px-2 py-1 rounded hover:bg-terminal-green/10"
+                  >
+                    HOST
+                  </button>
+                  <button
+                    onClick={() => {
+                      const id = prompt("Enter Session ID:");
+                      if (id) joinSession(id);
+                    }}
+                    className="text-xs border border-terminal-lightGray text-terminal-lightGray px-2 py-1 rounded hover:bg-white/10"
+                  >
+                    JOIN
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <span className="text-terminal-amber text-xs font-bold">SESSION: {sessionId}</span>
+                  <span className="text-terminal-lightGray text-xs">({connectedPlayers.length} online)</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center space-x-2 border-l border-terminal-gray pl-4">
             <span className="text-terminal-lightGray text-xs uppercase hidden md:inline">Debug</span>
             <button
@@ -122,6 +195,10 @@ const App: React.FC = () => {
               <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full bg-current transition-transform duration-200 ${gameState.debugMode ? 'translate-x-4 text-terminal-amber' : 'text-terminal-gray'}`}></div>
             </button>
           </div>
+
+          {isSyncing && (
+            <span className="text-terminal-green text-xs animate-pulse">SAVING...</span>
+          )}
 
           <button
             onClick={resetGame}
@@ -143,6 +220,7 @@ const App: React.FC = () => {
             history={gameState.history}
             isLoading={gameState.isLoading}
             onReferenceClick={inspectItem}
+            userId={user?.user_metadata?.username || user?.id || 'guest'}
           />
 
           {/* Input Area */}

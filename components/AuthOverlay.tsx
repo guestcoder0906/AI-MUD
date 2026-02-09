@@ -1,102 +1,150 @@
 
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
-export const AuthOverlay: React.FC = () => {
-    const { user, username, isGuest, signInAsGuest, updateUsername, loading } = useAuth();
-    const [isEditing, setIsEditing] = useState(false);
-    const [newUsername, setNewUsername] = useState('');
+interface AuthOverlayProps {
+    onLogin: (user: any) => void;
+    onGuest: () => void;
+}
+
+export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onGuest }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [username, setUsername] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    useEffect(() => {
+        // Check for existing session
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                onLogin(session.user);
+            }
+        };
+        checkSession();
+    }, [onLogin]);
+
+    const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newUsername.trim()) return;
-
+        setLoading(true);
         setError(null);
+
         try {
-            await updateUsername(newUsername.trim());
-            setIsEditing(false);
+            if (isSignUp) {
+                // Sign Up
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            username: username || `User_${Math.floor(Math.random() * 10000)}`,
+                        },
+                    },
+                });
+                if (error) throw error;
+                if (data.user) {
+                    // Use sign up automatically logs you in if email confirmation is disabled, 
+                    // otherwise prompts for confirmation. Assuming auto-confirm or ignoring for now.
+                    onLogin(data.user);
+                }
+            } else {
+                // Login
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                if (error) throw error;
+                if (data.user) {
+                    onLogin(data.user);
+                }
+            }
         } catch (err: any) {
-            setError(err.message || 'Failed to update username');
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 text-terminal-green font-mono">
-                <div className="animate-pulse">Initializing Neural Link...</div>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/95 text-terminal-green font-mono">
-                <div className="max-w-md w-full p-8 border border-terminal-green/30 bg-terminal-black shadow-[0_0_20px_rgba(0,255,0,0.1)]">
-                    <h1 className="text-2xl font-bold mb-6 text-center tracking-widest text-terminal-amber">OMNISCRIPT ENGINE</h1>
-                    <div className="space-y-4">
-                        <p className="text-sm text-terminal-lightGray text-center mb-8">
-                            "Reality is a construct. Verification required."
-                        </p>
-
-                        <button
-                            onClick={signInAsGuest}
-                            className="w-full py-3 border border-terminal-green hover:bg-terminal-green/10 text-terminal-green transition-all duration-200 uppercase tracking-wider font-bold"
-                        >
-                            Enter as Guest Interface
-                        </button>
-
-                        <p className="text-xs text-center text-terminal-gray mt-4">
-                            *Full account registration disabled for this terminal session.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="fixed top-2 right-2 md:top-4 md:right-4 z-50">
-            {!isEditing ? (
-                <div
-                    onClick={() => setIsEditing(true)}
-                    className="cursor-pointer group flex items-center space-x-2 bg-black/80 border border-terminal-gray/50 px-3 py-1.5 rounded hover:border-terminal-amber transition-all"
-                >
-                    <div className={`w-2 h-2 rounded-full ${isGuest ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`} />
-                    <span className="text-xs text-terminal-lightGray font-mono group-hover:text-terminal-amber">
-                        {username || 'Unknown'} {isGuest && '(GUEST)'}
-                    </span>
-                </div>
-            ) : (
-                <div className="bg-black border border-terminal-green p-3 rounded shadow-lg min-w-[200px]">
-                    <form onSubmit={handleSubmit}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+            <div className="w-full max-w-md p-8 bg-terminal-black border border-terminal-green rounded-lg shadow-[0_0_20px_rgba(0,255,0,0.2)]">
+                <h2 className="text-2xl font-bold text-terminal-green mb-6 text-center tracking-widest uppercase">
+                    {isSignUp ? 'Initialize User Identity' : 'Authenticate Access'}
+                </h2>
+
+                {error && (
+                    <div className="mb-4 p-3 bg-red-900/30 border border-red-500 text-red-500 text-sm rounded">
+                        ERROR: {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleAuth} className="space-y-4">
+                    <div>
+                        <label className="block text-terminal-lightGray text-xs uppercase mb-1">Email Coordinates</label>
                         <input
-                            type="text"
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            placeholder={username || "Set Identity"}
-                            className="w-full bg-terminal-gray/10 border border-terminal-gray px-2 py-1 text-xs text-terminal-green focus:border-terminal-green outline-none mb-2"
-                            autoFocus
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-2 text-terminal-green focus:border-terminal-green focus:outline-none"
+                            placeholder="user@net.com"
+                            required
                         />
-                        {error && <div className="text-[10px] text-red-500 mb-2">{error}</div>}
-                        <div className="flex space-x-2 justify-end">
-                            <button
-                                type="button"
-                                onClick={() => setIsEditing(false)}
-                                className="text-[10px] text-terminal-gray hover:text-white uppercase"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="text-[10px] text-terminal-green hover:text-white uppercase font-bold"
-                            >
-                                Save
-                            </button>
+                    </div>
+
+                    <div>
+                        <label className="block text-terminal-lightGray text-xs uppercase mb-1">Passcode Sequence</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-2 text-terminal-green focus:border-terminal-green focus:outline-none"
+                            placeholder="••••••••"
+                            required
+                        />
+                    </div>
+
+                    {isSignUp && (
+                        <div>
+                            <label className="block text-terminal-lightGray text-xs uppercase mb-1">Display Alias (Optional)</label>
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-2 text-terminal-green focus:border-terminal-green focus:outline-none"
+                                placeholder="Unique_ID"
+                            />
                         </div>
-                    </form>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-terminal-green text-terminal-black font-bold py-2 rounded hover:bg-green-400 transition-colors disabled:opacity-50"
+                    >
+                        {loading ? 'Processing...' : (isSignUp ? 'REGISTER ENTITY' : 'ESTABLISH LINK')}
+                    </button>
+                </form>
+
+                <div className="mt-6 flex flex-col items-center space-y-3">
+                    <button
+                        onClick={() => setIsSignUp(!isSignUp)}
+                        className="text-terminal-lightGray hover:text-terminal-green text-sm underline decoration-terminal-gray hover:decoration-terminal-green underline-offset-4"
+                    >
+                        {isSignUp ? 'Provide existing credentials' : 'Create new identity record'}
+                    </button>
+
+                    <div className="w-full border-t border-terminal-gray/50"></div>
+
+                    <button
+                        onClick={onGuest}
+                        className="text-terminal-amber text-xs uppercase tracking-wider hover:text-yellow-300 transition-colors"
+                    >
+                        [ Initiate Guest Protocol (Local Storage Only) ]
+                    </button>
                 </div>
-            )}
+            </div>
         </div>
     );
 };

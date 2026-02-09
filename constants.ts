@@ -62,6 +62,13 @@ Your goal is to manage a persistent, infinite world state through simulated "fil
   "timeDelta": 12
 }
 \`\`\`
+6. **Multiplayer & Private Messaging:**
+   - You may receive input flagged as \`[MULTIPLAYER TURN]\`. parsing multiple player actions.
+   - **Global Narrative**: Describe events visible to all.
+   - **Private/Local Info**: Use the syntax \`local(PlayerName)[private message]\` for text ONLY visible to that player.
+     - *Example:* "The dragonguard shouts. local(Thief)[You notice a loose scale on its underbelly.] local(Mage)[You sense a fire aura.]"
+   - **Targeting**: Use the exact PlayerName provided in the input.
+
 Return ONLY raw JSON.
 `;
 
