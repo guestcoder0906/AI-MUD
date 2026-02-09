@@ -7,6 +7,7 @@ import { LiveTicker } from './components/LiveTicker';
 import { AuthOverlay } from './components/AuthOverlay';
 import { UsernameSetup } from './components/UsernameSetup';
 import { PlayerList } from './components/PlayerList';
+import { CharacterSetupModal } from './components/CharacterSetupModal';
 import { supabase } from './lib/supabaseClient';
 
 const App: React.FC = () => {
@@ -139,6 +140,13 @@ const App: React.FC = () => {
           onGuest={() => {
             setAuthChecked(true);
           }}
+        />
+      )}
+
+      {/* Character Setup Modal - Mandatory for players without a file once game starts */}
+      {sessionId && isGameStarted && !hasCharacterFile && (
+        <CharacterSetupModal
+          onComplete={(description) => broadcastAction(description)}
         />
       )}
 
@@ -327,8 +335,8 @@ const App: React.FC = () => {
             userId={currentUsername}
           />
 
-          {/* Live Ticker - Now positioned in top right overlay (where player list was) */}
-          <div className="absolute top-4 right-4 z-50 max-w-sm pointer-events-none">
+          {/* Live Ticker - Positioned in bottom right overlay with highest z-index */}
+          <div className="absolute bottom-4 right-4 z-[60] max-w-sm pointer-events-none">
             <LiveTicker updates={gameState.liveUpdates} />
           </div>
 
