@@ -11,7 +11,7 @@ export const LiveTicker: React.FC<LiveTickerProps> = ({ updates }) => {
   // App.tsx places this in a container.
 
   return (
-    <div className="flex flex-col-reverse items-end space-y-reverse space-y-1">
+    <div className="flex flex-col items-end space-y-1">
       {updates.slice(0, 5).map((update, idx) => (
         <div
           key={update.id}

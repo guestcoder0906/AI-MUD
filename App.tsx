@@ -39,12 +39,15 @@ const App: React.FC = () => {
     isHost,
     kickPlayer, // Added kickPlayer
     skipTurn,
-    isGameStarted
+    isGameStarted,
+    hasCharacterFile
   } = useMultiplayer(user, gameState, setGameState, handleInput);
 
   /* UI State */
   const [inputValue, setInputValue] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
   const [hasApiKey, setHasApiKey] = useState(true); // Assume true initially to avoid flicker, check on mount
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -139,6 +142,56 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Join Session Modal */}
+      {isJoining && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-terminal-black border border-terminal-gray p-6 w-full max-w-xs shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-terminal-green to-transparent opacity-50"></div>
+            <div className="text-terminal-amber font-bold mb-4 text-xs tracking-[0.2em] flex items-center">
+              <span className="mr-2">LINKING TO REALITY</span>
+              <div className="flex-1 h-[1px] bg-terminal-gray/30"></div>
+            </div>
+            <input
+              autoFocus
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="000000"
+              maxLength={6}
+              className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-3 text-terminal-green outline-none focus:border-terminal-green/50 mb-6 font-mono text-center text-xl tracking-[0.3em] transition-all placeholder:opacity-20"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && joinCode.length >= 4) {
+                  joinSession(joinCode);
+                  setIsJoining(false);
+                  setJoinCode('');
+                }
+                if (e.key === 'Escape') setIsJoining(false);
+              }}
+            />
+            <div className="flex space-x-2">
+              <button
+                disabled={joinCode.length < 4}
+                onClick={() => {
+                  if (joinCode) {
+                    joinSession(joinCode);
+                    setIsJoining(false);
+                    setJoinCode('');
+                  }
+                }}
+                className="flex-1 bg-terminal-green/10 border border-terminal-green/50 text-terminal-green py-2 text-[10px] font-bold hover:bg-terminal-green hover:text-black transition-all disabled:opacity-20 disabled:cursor-not-allowed uppercase tracking-widest"
+              >
+                Sync Reality
+              </button>
+              <button
+                onClick={() => setIsJoining(false)}
+                className="px-4 border border-terminal-gray text-terminal-lightGray py-2 text-[10px] hover:bg-white/5 uppercase tracking-widest"
+              >
+                Abort
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Username Setup Modal - Only if logged in but no custom username set */}
       {user && !user.user_metadata?.custom_username && (
         <UsernameSetup
@@ -204,10 +257,7 @@ const App: React.FC = () => {
                     HOST
                   </button>
                   <button
-                    onClick={() => {
-                      const id = prompt("Enter Session ID:");
-                      if (id) joinSession(id);
-                    }}
+                    onClick={() => setIsJoining(true)}
                     className="text-xs border border-terminal-lightGray text-terminal-lightGray px-2 py-1 rounded hover:bg-white/10"
                   >
                     JOIN
@@ -277,8 +327,8 @@ const App: React.FC = () => {
             userId={currentUsername}
           />
 
-          {/* Live Ticker - Now positioned in bottom right overlay */}
-          <div className="absolute bottom-4 right-4 z-20 max-w-sm pointer-events-none">
+          {/* Live Ticker - Now positioned in top right overlay (where player list was) */}
+          <div className="absolute top-4 right-4 z-50 max-w-sm pointer-events-none">
             <LiveTicker updates={gameState.liveUpdates} />
           </div>
 

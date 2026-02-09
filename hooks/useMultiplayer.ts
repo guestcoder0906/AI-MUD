@@ -13,7 +13,16 @@ export const useMultiplayer = (
     const [connectedPlayers, setConnectedPlayers] = useState<any[]>([]);
     const [pendingActions, setPendingActions] = useState<{ playerId: string, action: string }[]>([]);
     const [isGameStarted, setIsGameStarted] = useState(false);
+    // Check if current user has a player file
+    const [hasCharacterFile, setHasCharacterFile] = useState(false);
     const channelRef = useRef<any>(null);
+
+    useEffect(() => {
+        const username = user?.user_metadata?.username || user?.id || 'Guest';
+        // Check if file exists in gameState.files
+        const fileName = `Player_${username}.txt`;
+        setHasCharacterFile(!!gameState.files[fileName]);
+    }, [gameState.files, user]);
 
     // Derived Host State
     const hostPlayer = connectedPlayers.sort((a, b) => new Date(a.online_at).getTime() - new Date(b.online_at).getTime())[0];
@@ -156,20 +165,26 @@ export const useMultiplayer = (
     }, [pendingActions, connectedPlayers, isHost, sessionId, isGameStarted]);
 
     const processTurn = async (actions: { playerId: string, action: string }[]) => {
-        // Prepare prompt with context about player files
-        let compositeInput = "";
-
-        if (!isGameStarted && actions.length === 1) {
+        if (!isGameStarted && actions.length === 1 && isHost) {
             // First turn - Host initializing
-            compositeInput = `[SYSTEM: HOST INITIALIZATION] ${actions[0].action}`;
-        } else {
-            compositeInput = `[MULTIPLAYER TURN]\n` + actions.map(a => {
-                // We can add a hint to the engine to generate char if missing
-                // validation happens in engine using files, but we can hint here.
-                return `Player ${a.playerId} (${a.playerId === (user?.user_metadata?.username || 'Guest') ? 'Host' : 'Player'}) action: ${a.action}`;
-            }).join('\n');
+            const compositeInput = `[SYSTEM: HOST INITIALIZATION] ${actions[0].action}`;
+            await handleInput(compositeInput);
+            return;
         }
 
+        // Multiplayer Turn
+        const processedActions = actions.map(a => {
+            const playerFileName = `Player_${a.playerId}.txt`;
+            const playerFileExists = !!gameState.files[playerFileName];
+
+            if (!playerFileExists && isGameStarted) {
+                // This player is joining and needs a character file
+                return `[SYSTEM: NEW PLAYER JOINING] Player Name: ${a.playerId}. Character Description: "${a.action}". ACTION: Generate 'Player_${a.playerId}.txt' based on this description and place them in the starting location. Ensure it follows World_Rules.txt.`;
+            }
+            return `Player ${a.playerId}: ${a.action}`;
+        });
+
+        const compositeInput = `[MULTIPLAYER TURN]\n${processedActions.join('\n')}`;
         await handleInput(compositeInput);
     };
 
@@ -218,6 +233,7 @@ export const useMultiplayer = (
         isHost,
         kickPlayer,
         skipTurn,
-        isGameStarted
+        isGameStarted,
+        hasCharacterFile // Export this
     };
 };
