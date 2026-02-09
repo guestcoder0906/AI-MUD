@@ -8,32 +8,6 @@ interface TerminalProps {
   userId?: string;
 }
 
-const LocalMessage: React.FC<{ target: string, content: string, userId?: string, onReferenceClick: (ref: string) => void }> = ({ target, content, userId, onReferenceClick }) => {
-  // Logic: 
-  // If target == userId, show it.
-  // If target == "all", show it? (standard text handles all)
-  // If userId is undefined (guest?), maybe show if target is 'guest'?
-
-  // User requirement: "local(player1)[only player 1 can see this]"
-
-  if (target === userId) {
-    // Render it with a specific style? Or just normal text?
-    // "is not global like usual" implies it should look normal to the user, or maybe qualified?
-    // Let's make it look slightly distinct or just normal. 
-    // "like for example if an npc whispers only to one player then that happens" -> implies it should look like narrative.
-    // Let's render it as normal text but maybe italicized or colored to indicate it's special? 
-    // Or just normal. Let's do normal but wrapped for inspectables.
-
-    return (
-      <span className="text-terminal-cyan/80 italic">
-        {/* We still need to parse inspectables inside local messages! */}
-        {processInspectables(content, onReferenceClick)}
-      </span>
-    );
-  }
-  return null;
-};
-
 // Helper for reuse
 const processInspectables = (text: string, onClick: (ref: string) => void) => {
   const parts = text.split(/(\[.*?\])/g);
@@ -62,67 +36,14 @@ export const Terminal: React.FC<TerminalProps> = ({ history, isLoading, onRefere
   }, [history, isLoading]);
 
   const renderText = (text: string) => {
-    // Regex for local(player)[content]
-    // We need to handle this recursively or just specific blocks?
-    // The prompt says "text can be set like this local(player1)[blah blah]".
-    // It implies it could be embedded.
+    // 1. Filter content based on user ID logic
+    const filteredText = filterContentForUser(text, userId || '', userId || '');
 
-    // We'll split by the local pattern first.
-    // Regex: /local\((.*?)\)\[(.*?)\]/g  <-- non-greedy match
+    // 2. Process inspectables in the clean text
+    // If text became empty, we might return null or empty span?
+    if (!filteredText.trim() && text.trim().length > 0) return <span className="text-terminal-gray/20 italic text-[10px]">*silence*</span>;
 
-    const parts = [];
-    let lastIndex = 0;
-    const regex = /local\((.*?)\)\[(.*?)\]/g;
-    let match;
-
-    while ((match = regex.exec(text)) !== null) {
-      // Add text before match
-      if (match.index > lastIndex) {
-        parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
-      }
-
-      const targetPlayer = match[1];
-      const content = match[2];
-
-      // Check availability
-      // We need userId passed in props. 
-      // If no userId prop, we assume we see everything (or nothing? likely nothing if it's private)
-      // Actually, if we are the DM/Host maybe we see all? 
-      // For now, let's just match exact ID or 'all' maybe?
-
-      parts.push({ type: 'local', target: targetPlayer, content: content });
-
-      lastIndex = regex.lastIndex;
-    }
-
-    if (lastIndex < text.length) {
-      parts.push({ type: 'text', content: text.substring(lastIndex) });
-    }
-
-    return parts.map((part, index) => {
-      if (part.type === 'local') {
-        // If we don't have a user ID, we probably shouldn't see private messages unless we are debugging.
-        // But let's assume valid auth mapping.
-        // We need to pass `userId` to Terminal.
-        return (
-          <span key={index} className="local-message-container">
-            {/* We will filter this in the render return or here. 
-                        Since we can't conditionally return nothing easily in map without fragment,
-                        we'll handle visibility logic in a wrapper or just return null. 
-                    */}
-            <LocalMessage
-              target={part.target!}
-              content={part.content!}
-              userId={userId}
-              onReferenceClick={onReferenceClick}
-            />
-          </span>
-        );
-      }
-
-      // Standard text processing (inspectable items)
-      return <span key={index}>{processInspectables(part.content!, onReferenceClick)}</span>;
-    });
+    return processInspectables(filteredText, onReferenceClick);
   };
 
   const processInspectables = (text: string, onClick: (ref: string) => void) => {
@@ -140,7 +61,7 @@ export const Terminal: React.FC<TerminalProps> = ({ history, isLoading, onRefere
           </span>
         );
       }
-      return part;
+      return <span key={idx}>{part}</span>;
     });
   };
 

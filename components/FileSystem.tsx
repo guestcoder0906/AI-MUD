@@ -1,17 +1,33 @@
 import React, { useEffect } from 'react';
 import { FileObject } from '../types';
+import { filterContentForUser } from '../utils/textParsing';
+import { PlayerList } from './PlayerList'; // Import PlayerList
 
 interface FileSystemProps {
   files: Record<string, FileObject>;
   externalSelectedFile: string | null;
   onSelect: (fileName: string | null) => void;
   debugMode: boolean;
+  userId?: string;
+  // PlayerList Props
+  players?: any[];
+  isHost?: boolean;
+  onKick?: (userId: string) => void;
 }
 
-export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedFile, onSelect, debugMode }) => {
+export const FileSystem: React.FC<FileSystemProps> = ({
+  files,
+  externalSelectedFile,
+  onSelect,
+  debugMode,
+  userId,
+  players,
+  isHost,
+  onKick
+}) => {
   useEffect(() => {
     if (externalSelectedFile) {
-        // Optional: Scroll into view logic
+      // Optional: Scroll into view logic
     }
   }, [externalSelectedFile]);
 
@@ -21,16 +37,16 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
 
   const fileList = visibleFiles.sort((a, b) => {
     const getPriority = (type: string, name: string) => {
-        if (name === 'Guide.txt') return 0;
-        if (name.includes('Rules')) return 1;
-        if (type === 'PLAYER') return 2;
-        if (type === 'LOCATION') return 3;
-        return 4;
+      if (name === 'Guide.txt') return 0;
+      if (name.includes('Rules')) return 1;
+      if (type === 'PLAYER') return 2;
+      if (type === 'LOCATION') return 3;
+      return 4;
     };
-    
+
     const pA = getPriority(a.type, a.name);
     const pB = getPriority(b.type, b.name);
-    
+
     if (pA !== pB) return pA - pB;
     return a.name.localeCompare(b.name);
   });
@@ -46,7 +62,7 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
 
       <div className="flex-1 overflow-y-auto">
         {fileList.length === 0 && (
-            <div className="p-4 text-xs text-terminal-gray italic text-center">No files perceived yet.</div>
+          <div className="p-4 text-xs text-terminal-gray italic text-center">No files perceived yet.</div>
         )}
         {fileList.map((file) => (
           <div key={file.name}>
@@ -56,24 +72,45 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
             >
               <div className="flex items-center space-x-2 overflow-hidden">
                 {file.isHidden && debugMode && (
-                    <span className="text-[8px] px-1 border border-terminal-gray text-terminal-gray rounded">HIDDEN</span>
+                  <span className="text-[8px] px-1 border border-terminal-gray text-terminal-gray rounded">HIDDEN</span>
                 )}
                 <span className="truncate max-w-[120px]">{file.name}</span>
               </div>
-              <span className="text-[10px] opacity-50 ml-2 shrink-0">{file.type.substring(0,3)}</span>
+              <span className="text-[10px] opacity-50 ml-2 shrink-0">{file.type.substring(0, 3)}</span>
             </button>
-            
+
             {externalSelectedFile === file.name && (
               <div className="bg-black/80 p-3 text-[10px] font-mono text-terminal-lightGray overflow-x-auto whitespace-pre-wrap border-b border-terminal-gray/30 animate-fade-in shadow-inner relative">
                 {file.content.includes('hide[') && (
-                    <div className="absolute top-1 right-1 text-red-500 text-[9px] border border-red-500 px-1 rounded bg-black">HIDDEN LAYERS</div>
+                  <div className="absolute top-1 right-1 text-red-500 text-[9px] border border-red-500 px-1 rounded bg-black">HIDDEN LAYERS</div>
                 )}
-                {file.content}
+                {/* Apply Targeted Messaging Filter to Content */}
+                {filterContentForUser(file.content, userId || '', userId || '')}
               </div>
             )}
           </div>
         ))}
       </div>
+
+      {/* Embedded Player List */}
+      {players && players.length > 0 && (
+        <div className="border-t-2 border-terminal-gray bg-terminal-black p-0 shrink-0">
+          <div className="p-2 border-b border-terminal-gray/50 text-[10px] text-terminal-lightGray uppercase font-bold bg-terminal-gray/10">
+            Active Uplinks
+          </div>
+          {/* We pass styles to strip absolute positioning if needed, OR we modify PlayerList to be flexible */}
+          {/* PlayerList currently has "absolute bottom-4 right-4". We need to modify PlayerList to handle 'embedded' mode or just change its CSS. */}
+          {/* Strategy: Modifying PlayerList.tsx next is better. For now passing props. */}
+          <PlayerList
+            players={players}
+            currentUserId={userId || ''}
+            isHost={!!isHost}
+            onKick={onKick || (() => { })}
+            embedded={true} // New prop to handle styling
+          />
+        </div>
+      )}
+
     </div>
   );
 };
