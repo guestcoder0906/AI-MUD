@@ -3,6 +3,9 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { Terminal } from './components/Terminal';
 import { FileSystem } from './components/FileSystem';
 import { LiveTicker } from './components/LiveTicker';
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthOverlay } from './components/AuthOverlay';
+import { MultiplayerLobby } from './components/MultiplayerLobby';
 
 const App: React.FC = () => {
   const {
@@ -13,7 +16,8 @@ const App: React.FC = () => {
     inspectItem,
     selectedFile,
     setSelectedFile,
-    isPlayerDead
+    isPlayerDead,
+    multiplayer
   } = useGameEngine();
 
   const [inputValue, setInputValue] = useState('');
@@ -70,12 +74,21 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-terminal-black text-terminal-green font-mono flex flex-col overflow-hidden relative selection:bg-terminal-green selection:text-terminal-black">
-
+      <AuthOverlay />
+      <MultiplayerLobby
+        onCreateRoom={multiplayer.createRoom}
+        onJoinRoom={multiplayer.joinRoom}
+        onKickPlayer={multiplayer.kickPlayer}
+        participants={multiplayer.participants}
+        roomId={multiplayer.roomId}
+        isMultiplayer={multiplayer.isMultiplayer}
+        waitingForTurn={multiplayer.waitingForTurn}
+      />
       {/* Header / Status Bar */}
       <header className="h-12 border-b border-terminal-gray bg-terminal-black flex items-center justify-between px-4 z-20 shadow-md shrink-0">
         <div className="flex items-center space-x-4">
-          <div className="text-terminal-amber font-bold tracking-widest">OMNISCRIPT</div>
-          <div className="hidden md:block text-xs text-terminal-lightGray opacity-50">v3.1.0-ENGINE</div>
+          <div className="text-terminal-amber font-bold tracking-widest">AI-MUD</div>
+          <div className="hidden md:block text-xs text-terminal-lightGray opacity-50">v1.0.0</div>
         </div>
 
         <div className="flex items-center space-x-4 md:space-x-6 text-sm">

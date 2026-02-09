@@ -1,7 +1,7 @@
 import { FileObject, LogEntry } from "./types";
 
 export const SYSTEM_INSTRUCTION = `
-You are the Omniscript Engine, a sophisticated text-based reality operating system.
+You are the AI-MUD Engine, a sophisticated text-based reality operating system.
 Your goal is to manage a persistent, infinite world state through simulated "files" with strict logic enforcement.
 
 **CORE RULES & MECHANICS:**
@@ -74,7 +74,7 @@ export const generatePrompt = (
   // Pass all files to the AI, letting it decide what is relevant, 
   // but logically strictly filtering context could be an optimization. 
   // For now, we pass the "Active" files.
-  
+
   const relevantFiles = Object.values(files)
     .sort((a, b) => {
       if (a.type === 'GUIDE') return -1;
