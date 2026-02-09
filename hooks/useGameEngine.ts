@@ -61,26 +61,26 @@ export const useGameEngine = (user?: any) => {
     loadGame();
   }, [user]);
 
-  // Save Game State
+  // Save Game State - Debounced to prevent lag
   useEffect(() => {
     if (!gameState.isInitialized) return;
 
-    // Always save to local storage as backup/fast access
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
+    const saveState = async () => {
+      // Local Storage
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
 
-    // If logged in, save to Supabase (debounced/throttled effectively by effect)
-    if (user) {
-      const saveToCloud = async () => {
+      // Supabase
+      if (user) {
         await supabase.from('saves').upsert({
           user_id: user.id,
           state: gameState,
           updated_at: new Date().toISOString()
         });
-      };
-      // Simple debounce could be added here if updates are too frequent
-      const timeout = setTimeout(saveToCloud, 2000);
-      return () => clearTimeout(timeout);
-    }
+      }
+    };
+
+    const timeout = setTimeout(saveState, 2000);
+    return () => clearTimeout(timeout);
   }, [gameState, user]);
 
   const addLog = (text: string, type: LogEntry['type']) => {

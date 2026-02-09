@@ -138,14 +138,20 @@ export const useMultiplayer = (
     useEffect(() => {
         if (!sessionId || !isHost) return;
 
-        // If game not started, ONLY accept Host action
+        // If game not started, accept Host action OR New Player joins
         if (!isGameStarted) {
             const hostAction = pendingActions.find(a => a.playerId === (user?.user_metadata?.username || user?.id));
+            const joiningActions = pendingActions.filter(a => a.action.startsWith('Describe your character') || a.action.length > 5); // Heuristic for now
+
             if (hostAction) {
-                setIsGameStarted(true); // Host started it
-                processTurn([hostAction]);
+                setIsGameStarted(true);
+                processTurn(pendingActions); // Process everything
                 setPendingActions([]);
+                return;
             }
+
+            // If a player is joining but host hasn't started, host must still start.
+            // But we shouldn't lose the joining actions.
             return;
         }
 
@@ -188,9 +194,21 @@ export const useMultiplayer = (
         await handleInput(compositeInput);
     };
 
-    // HOST syncs state to others
+    // HOST syncs state to others - Optimized to skip redundant broadcasts
+    const lastFilesRef = useRef<string>('');
+    const lastHistoryRef = useRef<number>(0);
+    const lastTimeRef = useRef<number>(0);
+
     useEffect(() => {
-        if (isHost && sessionId && channelRef.current) {
+        if (!isHost || !sessionId || !channelRef.current) return;
+
+        const filesJson = JSON.stringify(gameState.files);
+        const historyCount = gameState.history.length;
+        const timeChanged = Math.abs(gameState.worldTime - lastTimeRef.current) >= 5; // Sync time every 5s if nothing else changed
+
+        const stateChanged = filesJson !== lastFilesRef.current || historyCount !== lastHistoryRef.current;
+
+        if (stateChanged || timeChanged) {
             channelRef.current.send({
                 type: 'broadcast',
                 event: 'gameState',
@@ -199,12 +217,15 @@ export const useMultiplayer = (
                     isGameStarted
                 }
             });
+            lastFilesRef.current = filesJson;
+            lastHistoryRef.current = historyCount;
+            lastTimeRef.current = gameState.worldTime;
         }
     }, [gameState, isHost, sessionId, isGameStarted]);
 
     const broadcastAction = async (action: string) => {
         if (channelRef.current) {
-            const playerId = user?.user_metadata?.username || 'Guest';
+            const playerId = user?.user_metadata?.username || user?.id || `Guest_${Math.floor(Math.random() * 1000)}`;
             await channelRef.current.send({
                 type: 'broadcast',
                 event: 'action',

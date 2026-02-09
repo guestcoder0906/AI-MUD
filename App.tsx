@@ -147,6 +147,7 @@ const App: React.FC = () => {
       {sessionId && isGameStarted && !hasCharacterFile && (
         <CharacterSetupModal
           onComplete={(description) => broadcastAction(description)}
+          isLoading={gameState.isLoading}
         />
       )}
 
@@ -156,14 +157,14 @@ const App: React.FC = () => {
           <div className="bg-terminal-black border border-terminal-gray p-6 w-full max-w-xs shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-terminal-green to-transparent opacity-50"></div>
             <div className="text-terminal-amber font-bold mb-4 text-xs tracking-[0.2em] flex items-center">
-              <span className="mr-2">LINKING TO REALITY</span>
+              <span className="mr-2">JOIN GAME SESSION</span>
               <div className="flex-1 h-[1px] bg-terminal-gray/30"></div>
             </div>
             <input
               autoFocus
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="000000"
+              placeholder="ENTER SESSION ID"
               maxLength={6}
               className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-3 text-terminal-green outline-none focus:border-terminal-green/50 mb-6 font-mono text-center text-xl tracking-[0.3em] transition-all placeholder:opacity-20"
               onKeyDown={(e) => {
@@ -187,13 +188,13 @@ const App: React.FC = () => {
                 }}
                 className="flex-1 bg-terminal-green/10 border border-terminal-green/50 text-terminal-green py-2 text-[10px] font-bold hover:bg-terminal-green hover:text-black transition-all disabled:opacity-20 disabled:cursor-not-allowed uppercase tracking-widest"
               >
-                Sync Reality
+                Join Session
               </button>
               <button
                 onClick={() => setIsJoining(false)}
                 className="px-4 border border-terminal-gray text-terminal-lightGray py-2 text-[10px] hover:bg-white/5 uppercase tracking-widest"
               >
-                Abort
+                Cancel
               </button>
             </div>
           </div>
