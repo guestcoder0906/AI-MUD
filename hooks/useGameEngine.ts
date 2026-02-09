@@ -202,7 +202,7 @@ export const useGameEngine = () => {
 
   // Apply user-specific filtering to the exposed state
   const filesForUser = Object.fromEntries(
-    Object.entries(gameState.files).map(([k, v]) => [
+    (Object.entries(gameState.files) as [string, FileObject][]).map(([k, v]) => [
       k,
       { ...v, content: parseContentForUser(v.content, username) }
     ])
