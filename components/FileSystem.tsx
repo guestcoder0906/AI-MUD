@@ -47,7 +47,7 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
         </h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {fileList.length === 0 && (
           <div className="p-4 text-xs text-terminal-gray italic text-center">No files perceived yet.</div>
         )}
@@ -82,9 +82,9 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
       {/* Live Status Updates Section */}
       <div className="border-t border-terminal-gray bg-terminal-black p-3 shrink-0">
         <div className="text-[10px] uppercase text-terminal-lightGray mb-2 tracking-wider font-bold">Live Status</div>
-        <div className="relative h-32 overflow-hidden">
+        <div className="relative h-32 overflow-y-auto custom-scrollbar">
           {/* We wrap LiveTicker to constrain it within this box */}
-          <div className="absolute bottom-0 right-0 w-full flex justify-end">
+          <div className="w-full flex justify-end">
             <LiveTicker updates={liveUpdates} />
           </div>
         </div>
