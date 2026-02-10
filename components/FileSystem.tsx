@@ -65,10 +65,10 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
 
             {externalSelectedFile === file.name && (
               <div className="bg-black/80 p-3 text-[10px] font-mono text-terminal-lightGray overflow-x-auto whitespace-pre-wrap border-b border-terminal-gray/30 animate-fade-in shadow-inner relative">
-                {file.content.includes('hide[') && (
+                {debugMode && file.content.includes('hide[') && (
                   <div className="absolute top-1 right-1 text-red-500 text-[9px] border border-red-500 px-1 rounded bg-black">HIDDEN LAYERS</div>
                 )}
-                {file.content}
+                {debugMode ? file.content : file.content.replace(/hide\[[\s\S]*?\]/g, '')}
               </div>
             )}
           </div>
