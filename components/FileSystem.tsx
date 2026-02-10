@@ -1,14 +1,17 @@
 import React, { useEffect } from 'react';
-import { FileObject } from '../types';
+import { FileObject, LiveUpdate } from '../types';
+import { LiveTicker } from './LiveTicker';
 
 interface FileSystemProps {
   files: Record<string, FileObject>;
   externalSelectedFile: string | null;
   onSelect: (fileName: string | null) => void;
+
   debugMode: boolean;
+  liveUpdates: LiveUpdate[];
 }
 
-export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedFile, onSelect, debugMode }) => {
+export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedFile, onSelect, debugMode, liveUpdates }) => {
   useEffect(() => {
     if (externalSelectedFile) {
       // Optional: Scroll into view logic
@@ -73,6 +76,18 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
             )}
           </div>
         ))}
+      </div>
+
+
+      {/* Live Status Updates Section */}
+      <div className="border-t border-terminal-gray bg-terminal-black p-3 shrink-0">
+        <div className="text-[10px] uppercase text-terminal-lightGray mb-2 tracking-wider font-bold">Live Status</div>
+        <div className="relative h-32 overflow-hidden">
+          {/* We wrap LiveTicker to constrain it within this box */}
+          <div className="absolute bottom-0 right-0 w-full flex justify-end">
+            <LiveTicker updates={liveUpdates} />
+          </div>
+        </div>
       </div>
     </div>
   );

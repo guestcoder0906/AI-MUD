@@ -27,6 +27,7 @@ export interface GameState {
   files: Record<string, FileObject>;
   history: LogEntry[];
   liveUpdates: LiveUpdate[];
+  isPlayerDead: boolean;
 }
 
 export interface EngineResponse {

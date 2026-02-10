@@ -13,6 +13,7 @@ export const useGameEngine = () => {
     files: INITIAL_FILES,
     history: [],
     liveUpdates: [],
+    isPlayerDead: false,
   });
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -101,6 +102,32 @@ export const useGameEngine = () => {
       // Increment time (assuming timeDelta is in seconds, convert to ms)
       newWorldTime += (response.timeDelta * 1000);
 
+      let isPlayerDead = prev.isPlayerDead;
+      const playerFile = newFiles['Player.txt'];
+
+      if (playerFile && (
+        playerFile.content.toLowerCase().includes('status: dead') ||
+        playerFile.content.toLowerCase().includes('health: 0')
+      )) {
+        isPlayerDead = true;
+        // Trigger death sequence
+        delete newFiles['Player.txt'];
+
+        // Add death notification
+        newLiveUpdates.unshift({
+          id: crypto.randomUUID(),
+          text: "You died! Reset for a new adventure.",
+          type: 'NEGATIVE'
+        });
+
+        newHistory.push({
+          id: crypto.randomUUID(),
+          text: "You have died. Your adventure ends here.",
+          type: 'SYSTEM',
+          timestamp: Date.now()
+        });
+      }
+
       return {
         ...prev,
         isInitialized: true,
@@ -109,6 +136,7 @@ export const useGameEngine = () => {
         files: newFiles,
         history: newHistory,
         liveUpdates: [...newLiveUpdates, ...prev.liveUpdates].slice(0, 50),
+        isPlayerDead,
       };
     });
   };
@@ -116,14 +144,7 @@ export const useGameEngine = () => {
   const handleInput = useCallback(async (input: string) => {
     if (!input.trim()) return;
 
-    // Check if player is dead
-    const playerFile = gameState.files['Player.txt'];
-    const isDead = playerFile && (
-      playerFile.content.toLowerCase().includes('status: dead') ||
-      playerFile.content.toLowerCase().includes('health: 0')
-    );
-
-    if (isDead) {
+    if (gameState.isPlayerDead) {
       addLog(`FATAL: ACCESS DENIED. PLAYER STATUS: DECEASED.`, 'ERROR');
       return;
     }
@@ -147,11 +168,13 @@ export const useGameEngine = () => {
     }
   }, [gameState.files, gameState.history, gameState.worldTime]);
 
+  /* Deprecated: Use gameState.isPlayerDead directly
   const isPlayerDead =
     gameState.files['Player.txt'] && (
       gameState.files['Player.txt'].content.toLowerCase().includes('status: dead') ||
       gameState.files['Player.txt'].content.toLowerCase().includes('health: 0')
     );
+  */
 
   const toggleDebug = () => {
     setGameState(prev => ({ ...prev, debugMode: !prev.debugMode }));
@@ -182,6 +205,7 @@ export const useGameEngine = () => {
       files: INITIAL_FILES,
       history: [],
       liveUpdates: [],
+      isPlayerDead: false,
     });
     window.location.reload();
   };
@@ -195,6 +219,6 @@ export const useGameEngine = () => {
     setSelectedFile,
     error,
     resetGame,
-    isPlayerDead
+    isPlayerDead: gameState.isPlayerDead
   };
 };

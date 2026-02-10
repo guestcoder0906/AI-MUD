@@ -34,10 +34,15 @@ Your goal is to manage a persistent, infinite world state through simulated "fil
    - **Logic Check**: BEFORE allowing an action, cross-reference \`Player.txt\` (Stamina/Items) and \`World_Rules.txt\`. Reject impossible actions.
    - **Interrupts**: If an event happens (e.g., status effect expires) during the action's duration, interrupt the narrative.
 
-5. **Status Effects & expiration:**
+5.   - **Status Effects & expiration:**
    - Write statuses to Player/NPC files with expiration: \`[Status:Bleeding(Expires: 12:05:00)]\`.
    - Automatically remove them when World Time > Expiration.
    - **INITIAL TIME**: On the very first turn (when World Time is 0), you MUST include an \`initialTime\` field in the JSON response. This should be a full timestamp string (ISO 8601) appropriate for the setting (e.g., "1942-06-03T08:00:00" for WW2, "2077-11-20T23:45:00" for Cyberpunk).
+   - **REALISTIC ENCUMBRANCE**: You MUST enforce realistic physical limitations. If a player is carrying heavy items (e.g., full plate armor, multiple weapons, heavy debris), describe the physical toll. They should experience reduced agility, faster stamina drain, or inability to perform acrobatic feats. Explicitly mention these constraints in the narrative.
+   - **PLAYER DEATH**: If Player Health reaches 0, you MUST:
+     1. Set their status to DEAD in \`Player.txt\`.
+     2. Output a narrative describing their specific death.
+     3. The system will handle file deletion, but you must ensure the state reflects the fatality (Health: 0).
 
 
 **OUTPUT JSON FORMAT:**

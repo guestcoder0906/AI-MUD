@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useGameEngine } from './hooks/useGameEngine';
 import { Terminal } from './components/Terminal';
 import { FileSystem } from './components/FileSystem';
-import { LiveTicker } from './components/LiveTicker';
+
 
 const App: React.FC = () => {
   const {
@@ -143,10 +143,7 @@ const App: React.FC = () => {
           {/* Input Area + Live Ticker Positioned Relative to it */}
           <div className="relative bg-terminal-black border-t border-terminal-gray shrink-0">
 
-            {/* Live Ticker - Positioned Absolute Bottom Right above input */}
-            <div className="absolute bottom-full right-4 pb-2 flex flex-col items-end pointer-events-none">
-              <LiveTicker updates={gameState.liveUpdates} />
-            </div>
+            {/* Live Ticker Moved to FileSystem Sidebar */}
 
             <div className="p-4">
               <form onSubmit={onSubmit} className="relative flex items-center">
@@ -186,6 +183,7 @@ const App: React.FC = () => {
                 externalSelectedFile={selectedFile}
                 onSelect={setSelectedFile}
                 debugMode={gameState.debugMode}
+                liveUpdates={gameState.liveUpdates}
               />
             </div>
           </aside>
