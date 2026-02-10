@@ -6,13 +6,9 @@ interface LiveTickerProps {
 }
 
 export const LiveTicker: React.FC<LiveTickerProps> = ({ updates }) => {
-  // Show most recent updates. Since it's bottom-right, we want them to stack upwards?
-  // Or just list them.
-  // App.tsx places this in a container.
-
   return (
-    <div className="flex flex-col-reverse items-end space-y-reverse space-y-1">
-      {updates.slice(0, 5).map((update, idx) => (
+    <div className="w-64 pointer-events-none z-10 flex flex-col items-end space-y-1">
+      {updates.slice(0, 6).map((update, idx) => ( // Only show most recent 6 for visual clarity
         <div
           key={update.id}
           className={`

@@ -1,64 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGameEngine } from './hooks/useGameEngine';
-import { useMultiplayer } from './hooks/useMultiplayer';
 import { Terminal } from './components/Terminal';
 import { FileSystem } from './components/FileSystem';
 import { LiveTicker } from './components/LiveTicker';
-import { AuthOverlay } from './components/AuthOverlay';
-import { UsernameSetup } from './components/UsernameSetup';
-import { PlayerList } from './components/PlayerList';
-import { CharacterSetupModal } from './components/CharacterSetupModal';
-import { supabase } from './lib/supabaseClient';
 
 const App: React.FC = () => {
-  /* Auth State */
-  const [user, setUser] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-
-  /* Game Engine Hook */
   const {
     gameState,
-    setGameState,
     handleInput,
     resetGame,
     toggleDebug,
     inspectItem,
     selectedFile,
     setSelectedFile,
-    isPlayerDead,
-    isSyncing
-  } = useGameEngine(user);
+    isPlayerDead
+  } = useGameEngine();
 
-  /* Multiplayer Hook */
-  const {
-    sessionId,
-    createSession,
-    joinSession,
-    leaveSession, // Added leaveSession
-    connectedPlayers,
-    broadcastAction,
-    isHost,
-    kickPlayer, // Added kickPlayer
-    skipTurn,
-    isGameStarted,
-    hasCharacterFile
-  } = useMultiplayer(user, gameState, setGameState, handleInput);
-
-  /* UI State */
   const [inputValue, setInputValue] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-  const [joinCode, setJoinCode] = useState('');
   const [hasApiKey, setHasApiKey] = useState(true); // Assume true initially to avoid flicker, check on mount
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleLogout = async () => {
-    if (sessionId) await leaveSession();
-    await supabase.auth.signOut();
-    setUser(null);
-    setAuthChecked(false);
-  };
-
 
   // Check for API Key presence via AI Studio integration
   useEffect(() => {
@@ -68,9 +29,7 @@ const App: React.FC = () => {
         setHasApiKey(hasKey);
       } else {
         // If not in AI Studio environment, check env var directly
-        // Vite handles the replacement of process.env.API_KEY
-        const key = process.env.API_KEY;
-        setHasApiKey(!!key && key !== 'undefined' && key !== 'null' && key.length > 0);
+        setHasApiKey(!!process.env.API_KEY);
       }
     };
     checkApiKey();
@@ -98,122 +57,34 @@ const App: React.FC = () => {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    handleInput(inputValue);
+    setInputValue('');
+  };
 
-    if (sessionId) {
-      // Multiplayer Mode
-      broadcastAction(inputValue);
-      // We also want to show it locally as "Pending" or just clear input?
-      // For now, let's clear input and maybe add a local log via handleInput if we want validity checking?
-      // But the requirement says "waits for all players to submit".
-      // So we probably shouldn't execute it locally yet.
-      // I'll add a log entry saying "Waiting for others..."
-      // actually `broadcastAction` also calls `handleRemoteAction` for self which adds to pending.
-      // But we need to give feedback.
-      setInputValue('');
-    } else {
-      // Single Player
-      handleInput(inputValue);
-      setInputValue('');
+  const formatTime = (time: number) => {
+    if (time === 0) return "TIME NOT SET";
+    try {
+      return new Date(time).toLocaleDateString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return "INVALID TIME";
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // derived username for display
-  const currentUsername = user?.user_metadata?.username || user?.id || 'Guest';
-
   return (
     <div className="h-screen w-screen bg-terminal-black text-terminal-green font-mono flex flex-col overflow-hidden relative selection:bg-terminal-green selection:text-terminal-black">
-
-      {!authChecked && !user && (
-        <AuthOverlay
-          onLogin={(u) => {
-            setUser(u);
-            setAuthChecked(true);
-          }}
-          onGuest={() => {
-            setAuthChecked(true);
-          }}
-        />
-      )}
-
-      {/* Character Setup Modal - Mandatory for players without a file once game starts */}
-      {sessionId && isGameStarted && !hasCharacterFile && (
-        <CharacterSetupModal
-          onComplete={(description) => broadcastAction(description)}
-          isLoading={gameState.isLoading}
-        />
-      )}
-
-      {/* Join Session Modal */}
-      {isJoining && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-terminal-black border border-terminal-gray p-6 w-full max-w-xs shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-terminal-green to-transparent opacity-50"></div>
-            <div className="text-terminal-amber font-bold mb-4 text-xs tracking-[0.2em] flex items-center">
-              <span className="mr-2">JOIN GAME SESSION</span>
-              <div className="flex-1 h-[1px] bg-terminal-gray/30"></div>
-            </div>
-            <input
-              autoFocus
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="ENTER SESSION ID"
-              maxLength={6}
-              className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-3 text-terminal-green outline-none focus:border-terminal-green/50 mb-6 font-mono text-center text-xl tracking-[0.3em] transition-all placeholder:opacity-20"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && joinCode.length >= 4) {
-                  joinSession(joinCode);
-                  setIsJoining(false);
-                  setJoinCode('');
-                }
-                if (e.key === 'Escape') setIsJoining(false);
-              }}
-            />
-            <div className="flex space-x-2">
-              <button
-                disabled={joinCode.length < 4}
-                onClick={() => {
-                  if (joinCode) {
-                    joinSession(joinCode);
-                    setIsJoining(false);
-                    setJoinCode('');
-                  }
-                }}
-                className="flex-1 bg-terminal-green/10 border border-terminal-green/50 text-terminal-green py-2 text-[10px] font-bold hover:bg-terminal-green hover:text-black transition-all disabled:opacity-20 disabled:cursor-not-allowed uppercase tracking-widest"
-              >
-                Join Session
-              </button>
-              <button
-                onClick={() => setIsJoining(false)}
-                className="px-4 border border-terminal-gray text-terminal-lightGray py-2 text-[10px] hover:bg-white/5 uppercase tracking-widest"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Username Setup Modal - Only if logged in but no custom username set */}
-      {user && !user.user_metadata?.custom_username && (
-        <UsernameSetup
-          user={user}
-          onComplete={(updatedUser) => setUser(updatedUser)}
-        />
-      )}
 
       {/* Header / Status Bar */}
       <header className="h-12 border-b border-terminal-gray bg-terminal-black flex items-center justify-between px-4 z-20 shadow-md shrink-0">
         <div className="flex items-center space-x-4">
           <div className="text-terminal-amber font-bold tracking-widest">AI-MUD</div>
-          <div className="hidden md:block text-xs text-terminal-lightGray opacity-50">v3.1.0-ENGINE</div>
+          <div className="hidden md:block text-xs text-terminal-lightGray opacity-50">v3.2.0-ENGINE</div>
         </div>
 
         <div className="flex items-center space-x-4 md:space-x-6 text-sm">
@@ -226,24 +97,8 @@ const App: React.FC = () => {
             </button>
           )}
 
-          {user ? (
-            <div className="flex items-center space-x-2">
-              <div className="text-terminal-green text-xs border border-terminal-green/50 px-2 py-1 rounded bg-terminal-green/10">
-                ID: {currentUsername}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="text-xs text-terminal-lightGray hover:text-white border border-terminal-gray px-2 py-1 rounded hover:bg-white/10"
-              >
-                LOGOUT
-              </button>
-            </div>
-          ) : (
-            <div className="text-terminal-lightGray text-xs italic">Guest Mode</div>
-          )}
-
           <div className="flex items-center space-x-2">
-            <span className="text-terminal-lightGray text-xs uppercase hidden sm:inline">Time</span>
+            <span className="text-terminal-lightGray text-xs uppercase hidden sm:inline">World Time</span>
             <span className="text-terminal-green font-bold">{formatTime(gameState.worldTime)}</span>
           </div>
 
@@ -254,65 +109,15 @@ const App: React.FC = () => {
             {showSidebar ? 'Hide' : 'Files'}
           </button>
 
-          {/* Multiplayer Controls (Authenticated Only) */}
-          {user && (
-            <div className="flex items-center space-x-2 border-l border-terminal-gray pl-4">
-              {!sessionId ? (
-                <>
-                  <button
-                    onClick={createSession}
-                    className="text-xs border border-terminal-green text-terminal-green px-2 py-1 rounded hover:bg-terminal-green/10"
-                  >
-                    HOST
-                  </button>
-                  <button
-                    onClick={() => setIsJoining(true)}
-                    className="text-xs border border-terminal-lightGray text-terminal-lightGray px-2 py-1 rounded hover:bg-white/10"
-                  >
-                    JOIN
-                  </button>
-                </>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <span className="text-terminal-amber text-xs font-bold">SESSION: {sessionId}</span>
-                  <span className="text-terminal-lightGray text-xs">({connectedPlayers.length} online)</span>
-
-                  {isHost && isGameStarted && (
-                    <button
-                      onClick={skipTurn}
-                      className="text-xs border border-terminal-amber text-terminal-amber px-2 py-0.5 rounded ml-2 hover:bg-terminal-amber/10"
-                      title="Force end turn"
-                    >
-                      SKIP
-                    </button>
-                  )}
-
-                  <button
-                    onClick={leaveSession}
-                    className="text-xs text-red-500 hover:text-red-400 border border-red-900 rounded px-1 ml-2"
-                  >
-                    LEAVE
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {(!sessionId || isHost) && (
-            <div className="flex items-center space-x-2 border-l border-terminal-gray pl-4">
-              <span className="text-terminal-lightGray text-xs uppercase hidden md:inline">Debug</span>
-              <button
-                onClick={toggleDebug}
-                className={`w-8 h-4 rounded-full relative transition-colors duration-200 ease-in-out border ${gameState.debugMode ? 'bg-terminal-dimAmber border-terminal-amber' : 'bg-terminal-black border-terminal-gray'}`}
-              >
-                <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full bg-current transition-transform duration-200 ${gameState.debugMode ? 'translate-x-4 text-terminal-amber' : 'text-terminal-gray'}`}></div>
-              </button>
-            </div>
-          )}
-
-          {isSyncing && (
-            <span className="text-terminal-green text-xs animate-pulse">SAVING...</span>
-          )}
+          <div className="flex items-center space-x-2 border-l border-terminal-gray pl-4">
+            <span className="text-terminal-lightGray text-xs uppercase hidden md:inline">Debug</span>
+            <button
+              onClick={toggleDebug}
+              className={`w-8 h-4 rounded-full relative transition-colors duration-200 ease-in-out border ${gameState.debugMode ? 'bg-terminal-dimAmber border-terminal-amber' : 'bg-terminal-black border-terminal-gray'}`}
+            >
+              <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full bg-current transition-transform duration-200 ${gameState.debugMode ? 'translate-x-4 text-terminal-amber' : 'text-terminal-gray'}`}></div>
+            </button>
+          </div>
 
           <button
             onClick={resetGame}
@@ -333,34 +138,36 @@ const App: React.FC = () => {
             history={gameState.history}
             isLoading={gameState.isLoading}
             onReferenceClick={inspectItem}
-            userId={currentUsername}
           />
 
-          {/* Live Ticker - Positioned in bottom right overlay with highest z-index */}
-          <div className="absolute bottom-4 right-4 z-[60] max-w-sm pointer-events-none">
-            <LiveTicker updates={gameState.liveUpdates} />
-          </div>
+          {/* Input Area + Live Ticker Positioned Relative to it */}
+          <div className="relative bg-terminal-black border-t border-terminal-gray shrink-0">
 
-          {/* Input Area */}
-          <div className="p-4 bg-terminal-black border-t border-terminal-gray shrink-0 z-30">
-            <form onSubmit={onSubmit} className="relative flex items-center">
-              <span className="absolute left-3 text-terminal-amber font-bold animate-pulse">{'>'}</span>
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={
-                  isPlayerDead ? "PLAYER IS DECEASED - ACCESS DENIED" :
-                    !hasApiKey ? "Connect API Key to Start..." :
-                      (sessionId && !isHost && !isGameStarted) ? "Waiting for Host to Initialize World..." :
+            {/* Live Ticker - Positioned Absolute Bottom Right above input */}
+            <div className="absolute bottom-full right-4 pb-2 flex flex-col items-end pointer-events-none">
+              <LiveTicker updates={gameState.liveUpdates} />
+            </div>
+
+            <div className="p-4">
+              <form onSubmit={onSubmit} className="relative flex items-center">
+                <span className="absolute left-3 text-terminal-amber font-bold animate-pulse">{'>'}</span>
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={
+                    isPlayerDead ? "PLAYER IS DECEASED - ACCESS DENIED" :
+                      !hasApiKey ? "Connect API Key to Start..." :
                         (gameState.isInitialized ? "Enter command..." : "Initialize reality (e.g., 'A hard sci-fi space station running on low power')")
-                }
-                className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-3 pl-8 text-terminal-green focus:outline-none focus:border-terminal-green focus:ring-1 focus:ring-terminal-green placeholder-terminal-gray/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={gameState.isLoading || !hasApiKey || isPlayerDead || (!!sessionId && !isHost && !isGameStarted)}
-                autoComplete="off"
-              />
-            </form>
+                  }
+                  className="w-full bg-terminal-gray/10 border border-terminal-gray rounded p-3 pl-8 text-terminal-green focus:outline-none focus:border-terminal-green focus:ring-1 focus:ring-terminal-green placeholder-terminal-gray/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={gameState.isLoading || !hasApiKey || isPlayerDead}
+                  autoComplete="off"
+                />
+              </form>
+            </div>
           </div>
         </main>
 
@@ -379,17 +186,6 @@ const App: React.FC = () => {
                 externalSelectedFile={selectedFile}
                 onSelect={setSelectedFile}
                 debugMode={gameState.debugMode}
-                currentUserId={currentUsername}
-                PlayerListComponent={
-                  sessionId ? (
-                    <PlayerList
-                      players={connectedPlayers}
-                      currentUserId={user?.id}
-                      isHost={isHost}
-                      onKick={kickPlayer}
-                    />
-                  ) : null
-                }
               />
             </div>
           </aside>

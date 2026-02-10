@@ -40,7 +40,9 @@ export interface EngineResponse {
     isHidden?: boolean;
   }[];
   timeDelta: number;
+  initialTime?: string;
 }
+
 
 export const INITIAL_FILES: Record<string, FileObject> = {
   'Guide.txt': {
