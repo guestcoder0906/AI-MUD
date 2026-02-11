@@ -1,7 +1,7 @@
 export interface FileObject {
   name: string;
   content: string;
-  type: 'SYSTEM' | 'PLAYER' | 'LOCATION' | 'ITEM' | 'GUIDE';
+  type: 'SYSTEM' | 'PLAYER' | 'LOCATION' | 'ITEM' | 'GUIDE' | 'NPC';
   lastUpdated: number; // World time timestamp
   isHidden: boolean; // Controls visibility to the player
 }
@@ -36,7 +36,7 @@ export interface EngineResponse {
   fileUpdates: {
     fileName: string;
     content: string;
-    type: 'SYSTEM' | 'PLAYER' | 'LOCATION' | 'ITEM' | 'GUIDE';
+    type: 'SYSTEM' | 'PLAYER' | 'LOCATION' | 'ITEM' | 'GUIDE' | 'NPC';
     operation: 'CREATE' | 'UPDATE' | 'DELETE';
     isHidden?: boolean;
   }[];

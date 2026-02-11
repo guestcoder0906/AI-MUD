@@ -27,8 +27,9 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
       if (name === 'Guide.txt') return 0;
       if (name.includes('Rules')) return 1;
       if (type === 'PLAYER') return 2;
-      if (type === 'LOCATION') return 3;
-      return 4;
+      if (type === 'NPC') return 3;
+      if (type === 'LOCATION') return 4;
+      return 5;
     };
 
     const pA = getPriority(a.type, a.name);
