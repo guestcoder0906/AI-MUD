@@ -18,7 +18,7 @@ export const sendToEngine = async (
 ): Promise<EngineResponse> => {
   try {
     const ai = getAiClient();
-    
+
     // Using gemini-3-flash-preview as it is the recommended model for basic text tasks
     // and is highly efficient for real-time engine responses.
     const modelId = "gemini-3-flash-preview";
@@ -31,12 +31,12 @@ export const sendToEngine = async (
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
-        temperature: 0.7, 
+        temperature: 0.7,
       },
     });
 
     const responseText = response.text;
-    
+
     if (!responseText) {
       throw new Error("Empty response from AI Engine");
     }

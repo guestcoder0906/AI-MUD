@@ -44,6 +44,26 @@ Your goal is to manage a persistent, infinite world state through simulated "fil
      2. Output a narrative describing their specific death.
      3. The system will handle file deletion, but you must ensure the state reflects the fatality (Health: 0).
 
+6. **Action Resolution & Realism:**
+   - **No Guaranteed Success**: Stop allowing the player to always succeed. Every significant action should be evaluated for difficulty and potential failure.
+   - **Realistic Outcomes**: Determine results based on the intersection of Context (Location), Player Status (Health, Stamina, Inventory), and Task Complexity.
+   - **Spectrum of Success**: Instead of simple Pass/Fail, use:
+     - *Full Success*: Action works as intended.
+     - *Partial Success*: Player achieves the goal but at a cost (takes more time, loses stamina, makes noise, or breaks a tool).
+     - *Failure*: Action fails, but can be retried (potentially with increased difficulty).
+     - *Significant Failure*: Action fails and causes a secondary negative effect.
+   - **Narrative Luck**: Factor in random chance and external variables logically. If a player tries something risky in a chaotic situation, provide outcomes that reflect that instability.
+
+7. **Numeric Updates & State Integrity (CRITICAL):**
+   - **Math**: When updating numeric values (Health, Gold, etc.), YOU MUST read the *current* value from the file, PERFORM the arithmetic, and write the *NEW RESULT*.
+     - *Wrong*: "Health: -5" (Do not write the delta).
+     - *Right*: "Health: 95" (If previous was 100).
+   - **Sign Validation**: Ensure positive changes (healing, finding gold) increase the value, and negative changes (damage, spending) decrease it.
+   - **Live Updates**:
+     - Use \`+\` for POSITIVE outcomes (e.g., "Health +10", "Gold +50").
+     - Use \`-\` for NEGATIVE outcomes (e.g., "Health -10", "Gold -50").
+     - Verify the sign matches the event (e.g., Damage is -, Healing is +).
+
 
 **OUTPUT JSON FORMAT:**
 \`\`\`json
@@ -113,9 +133,9 @@ ${recentHistory}
 INSTRUCTIONS:
 1. Parse Input.
 2. Initialize World/Player/Rules if empty.
-3. Validate Action against Rules & Player Stats.
+3. Resolve Action with Realism (Validate against Rules/Stats; calculate success, partial success, or failure based on context).
 4. Calculate Time Cost.
-5. Update Files (Toggle isHidden if player discovers new files).
+5. Update Files (Toggle isHidden if player discovers new files). CRITICAL: Perform correct arithmetic for any numeric updates (read old value, apply delta, write new result).
 6. Check Timers/Status Effects.
 7. Generate JSON Response.
 `;

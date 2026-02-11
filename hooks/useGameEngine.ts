@@ -76,11 +76,17 @@ export const useGameEngine = () => {
         }
       });
 
-      const newLiveUpdates = response.liveUpdates.map(text => ({
-        id: crypto.randomUUID(),
-        text,
-        type: text.includes('-') ? 'NEGATIVE' : text.includes('+') ? 'POSITIVE' : 'NEUTRAL' as any,
-      }));
+      const newLiveUpdates = response.liveUpdates.map(text => {
+        let type: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' = 'NEUTRAL';
+        if (/[+]\s*\d/.test(text)) type = 'POSITIVE';
+        else if (/[-]\s*\d/.test(text)) type = 'NEGATIVE';
+
+        return {
+          id: crypto.randomUUID(),
+          text,
+          type
+        };
+      });
 
       const newHistory = [
         ...prev.history,
