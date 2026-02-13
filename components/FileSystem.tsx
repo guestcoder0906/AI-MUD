@@ -6,12 +6,12 @@ interface FileSystemProps {
   files: Record<string, FileObject>;
   externalSelectedFile: string | null;
   onSelect: (fileName: string | null) => void;
-
   debugMode: boolean;
   liveUpdates: LiveUpdate[];
+  userId?: string;
 }
 
-export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedFile, onSelect, debugMode, liveUpdates }) => {
+export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedFile, onSelect, debugMode, liveUpdates, userId }) => {
   useEffect(() => {
     if (externalSelectedFile) {
       // Optional: Scroll into view logic
@@ -38,6 +38,31 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
     if (pA !== pB) return pA - pB;
     return a.name.localeCompare(b.name);
   });
+
+  // Helper to filter content based on user
+  const filterContent = (content: string): string => {
+    if (debugMode) return content; // Show all in debug mode
+
+    // Remove hide[...] tags
+    let filtered = content.replace(/hide\[[\s\S]*?\]/g, '');
+
+    // Remove target() content that's not for this user
+    if (userId) {
+      // Keep only target() that includes this userId
+      filtered = filtered.replace(/target\((.*?)\[(.*?)\]\)/g, (match, targets, targetContent) => {
+        const targetList = targets.split(',').map((t: string) => t.trim());
+        if (targetList.includes(userId)) {
+          return targetContent; // Show the content without the syntax
+        }
+        return ''; // Remove if not for this user
+      });
+    } else {
+      // No userId, remove all target() content
+      filtered = filtered.replace(/target\((.*?)\[(.*?)\]\)/g, '');
+    }
+
+    return filtered;
+  };
 
   return (
     <div className="h-full flex flex-col bg-terminal-black border-l border-terminal-gray w-full md:w-80">
@@ -69,10 +94,10 @@ export const FileSystem: React.FC<FileSystemProps> = ({ files, externalSelectedF
 
             {externalSelectedFile === file.name && (
               <div className="bg-black/80 p-3 text-[10px] font-mono text-terminal-lightGray overflow-x-auto whitespace-pre-wrap border-b border-terminal-gray/30 animate-fade-in shadow-inner relative">
-                {debugMode && file.content.includes('hide[') && (
+                {debugMode && (file.content.includes('hide[') || file.content.includes('target(')) && (
                   <div className="absolute top-1 right-1 text-red-500 text-[9px] border border-red-500 px-1 rounded bg-black">HIDDEN LAYERS</div>
                 )}
-                {debugMode ? file.content : file.content.replace(/hide\[[\s\S]*?\]/g, '')}
+                {filterContent(file.content)}
               </div>
             )}
           </div>

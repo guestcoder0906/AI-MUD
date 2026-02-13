@@ -1,230 +1,242 @@
-import { useState, useCallback, useEffect } from 'react';
-import { GameState, LogEntry, FileObject, INITIAL_FILES, EngineResponse } from '../types';
+import { useState, useCallback, useRef } from 'react';
+import { GameState, FileObject, LogEntry, LiveUpdate, EngineResponse, INITIAL_FILES, GameMode } from '../types';
 import { sendToEngine } from '../services/gemini';
 
-const LOCAL_STORAGE_KEY = 'ai_mud_save_v2';
+// Since uuid is not in dependencies, we'll use a simple implementation
+const simpleUuid = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
 
-export const useGameEngine = () => {
-  const [gameState, setGameState] = useState<GameState>({
-    isInitialized: false,
-    isLoading: false,
-    debugMode: false,
-    worldTime: 0,
-    files: INITIAL_FILES,
-    history: [],
-    liveUpdates: [],
-    isPlayerDead: false,
-  });
+interface UseGameEngineOptions {
+    gameMode?: GameMode;
+    multiplayerUserId?: string;
+    multiplayerUsername?: string;
+    onTurnComplete?: () => void;
+}
 
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export const useGameEngine = (options: UseGameEngineOptions = {}) => {
+    const {
+        gameMode = 'single',
+        multiplayerUserId,
+        multiplayerUsername,
+        onTurnComplete
+    } = options;
 
-  useEffect(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setGameState({ ...parsed, debugMode: parsed.debugMode || false });
-      } catch (e) {
-        console.error("Failed to load save", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (gameState.isInitialized) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
-    }
-  }, [gameState]);
-
-  const addLog = (text: string, type: LogEntry['type']) => {
-    setGameState(prev => ({
-      ...prev,
-      history: [
-        ...prev.history,
-        {
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-          text,
-          type,
-        },
-      ],
-    }));
-  };
-
-  const processResponse = (response: EngineResponse) => {
-    setGameState(prev => {
-      const newFiles = { ...prev.files };
-
-      response.fileUpdates.forEach(update => {
-        if (update.operation === 'DELETE') {
-          delete newFiles[update.fileName];
-        } else {
-          // Preserve existing isHidden state if not explicitly provided in update
-          const existingFile = newFiles[update.fileName];
-          const isHidden = update.isHidden !== undefined
-            ? update.isHidden
-            : (existingFile ? existingFile.isHidden : false);
-
-          newFiles[update.fileName] = {
-            name: update.fileName,
-            content: update.content,
-            type: update.type,
-            lastUpdated: prev.worldTime + response.timeDelta,
-            isHidden: isHidden,
-          };
-        }
-      });
-
-      const newLiveUpdates = response.liveUpdates.map(text => {
-        let type: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' = 'NEUTRAL';
-        if (/[+]\s*\d/.test(text)) type = 'POSITIVE';
-        else if (/[-]\s*\d/.test(text)) type = 'NEGATIVE';
-
-        return {
-          id: crypto.randomUUID(),
-          text,
-          type
-        };
-      });
-
-      const newHistory = [
-        ...prev.history,
-        {
-          id: crypto.randomUUID(),
-          text: response.narrative,
-          type: 'NARRATIVE' as const,
-          timestamp: Date.now(),
-        },
-      ];
-
-      let newWorldTime = prev.worldTime;
-
-      // Handle Initial Time Setting from AI
-      if (response.initialTime && prev.worldTime === 0) {
-        newWorldTime = new Date(response.initialTime).getTime();
-      }
-
-      // Increment time (assuming timeDelta is in seconds, convert to ms)
-      newWorldTime += (response.timeDelta * 1000);
-
-      let isPlayerDead = prev.isPlayerDead;
-      const playerFile = newFiles['Player.txt'];
-
-      if (playerFile && (
-        playerFile.content.toLowerCase().includes('status: dead') ||
-        playerFile.content.toLowerCase().includes('health: 0')
-      )) {
-        isPlayerDead = true;
-        // Trigger death sequence
-        delete newFiles['Player.txt'];
-
-        // Add death notification
-        newLiveUpdates.unshift({
-          id: crypto.randomUUID(),
-          text: "You died! Reset for a new adventure.",
-          type: 'NEGATIVE'
-        });
-
-        newHistory.push({
-          id: crypto.randomUUID(),
-          text: "You have died. Your adventure ends here.",
-          type: 'SYSTEM',
-          timestamp: Date.now()
-        });
-      }
-
-      return {
-        ...prev,
-        isInitialized: true,
+    const [gameState, setGameState] = useState<GameState>({
+        isInitialized: false,
         isLoading: false,
-        worldTime: newWorldTime,
-        files: newFiles,
-        history: newHistory,
-        liveUpdates: [...newLiveUpdates, ...prev.liveUpdates].slice(0, 50),
-        isPlayerDead,
-      };
+        debugMode: false,
+        worldTime: 0,
+        files: INITIAL_FILES,
+        history: [],
+        liveUpdates: [],
+        isPlayerDead: false,
     });
-  };
 
-  const handleInput = useCallback(async (input: string) => {
-    if (!input.trim()) return;
+    const [selectedFile, setSelectedFile] = useState<string | null>(null);
+    const turnProcessingRef = useRef(false);
 
-    if (gameState.isPlayerDead) {
-      addLog(`FATAL: ACCESS DENIED. PLAYER STATUS: DECEASED.`, 'ERROR');
-      return;
-    }
+    const getPlayerFileName = useCallback(() => {
+        if (gameMode === 'multiplayer' && multiplayerUsername) {
+            return `Player_${multiplayerUsername}.txt`;
+        }
+        return 'Player.txt';
+    }, [gameMode, multiplayerUsername]);
 
-    setGameState(prev => ({ ...prev, isLoading: true }));
-    setError(null);
-    addLog(`> ${input}`, 'INPUT');
+    const checkPlayerDeath = (files: Record<string, FileObject>): boolean => {
+        const playerFileName = getPlayerFileName();
+        const playerFile = files[playerFileName];
 
-    try {
-      const response = await sendToEngine(
-        input,
-        gameState.files,
-        gameState.history,
-        gameState.worldTime
-      );
-      processResponse(response);
-    } catch (err: any) {
-      setError(err.message || "Unknown error occurred");
-      addLog(`System Error: ${err.message}`, 'ERROR');
-      setGameState(prev => ({ ...prev, isLoading: false }));
-    }
-  }, [gameState.files, gameState.history, gameState.worldTime]);
+        if (!playerFile) return false;
 
-  /* Deprecated: Use gameState.isPlayerDead directly
-  const isPlayerDead =
-    gameState.files['Player.txt'] && (
-      gameState.files['Player.txt'].content.toLowerCase().includes('status: dead') ||
-      gameState.files['Player.txt'].content.toLowerCase().includes('health: 0')
-    );
-  */
+        // Check if player file contains Health: 0 or status DEAD
+        const content = playerFile.content;
+        return content.includes('Health: 0') || content.includes('DEAD');
+    };
 
-  const toggleDebug = () => {
-    setGameState(prev => ({ ...prev, debugMode: !prev.debugMode }));
-  };
+    const handleInput = useCallback(async (userInput: string) => {
+        if (!userInput.trim() || gameState.isLoading || gameState.isPlayerDead) return;
 
-  const inspectItem = (referenceName: string) => {
-    const cleanName = referenceName.replace(/[\[\]]/g, '').split('(')[0];
-    const foundFile = (Object.values(gameState.files) as FileObject[]).find(f =>
-      f.name.includes(cleanName) || cleanName.includes(f.name.replace('.txt', ''))
-    );
+        // Prevent duplicate processing
+        if (turnProcessingRef.current) return;
+        turnProcessingRef.current = true;
 
-    // If we click a reference, we likely want to see it even if hidden, 
-    // but the system rules usually reveal it before linking. 
-    // We force debug mode to allow inspection of "under the hood" mechanics.
-    setGameState(prev => ({ ...prev, debugMode: true }));
-    if (foundFile) {
-      setSelectedFile(foundFile.name);
-    }
-  };
+        setGameState(prev => ({ ...prev, isLoading: true }));
 
-  const resetGame = () => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    setGameState({
-      isInitialized: false,
-      isLoading: false,
-      debugMode: false,
-      worldTime: 0,
-      files: INITIAL_FILES,
-      history: [],
-      liveUpdates: [],
-      isPlayerDead: false,
-    });
-    window.location.reload();
-  };
+        // Add user input to history
+        const inputEntry: LogEntry = {
+            id: simpleUuid(),
+            type: 'INPUT',
+            text: `> ${userInput}`,
+            timestamp: Date.now(),
+        };
 
-  return {
-    gameState,
-    handleInput,
-    toggleDebug,
-    inspectItem,
-    selectedFile,
-    setSelectedFile,
-    error,
-    resetGame,
-    isPlayerDead: gameState.isPlayerDead
-  };
+        setGameState(prev => ({
+            ...prev,
+            history: [...prev.history, inputEntry],
+        }));
+
+        try {
+            const response: EngineResponse = await sendToEngine(
+                userInput,
+                gameState.files,
+                gameState.history,
+                gameState.worldTime
+            );
+
+            // Process response
+            const newFiles = { ...gameState.files };
+
+            // Handle file updates
+            response.fileUpdates?.forEach(update => {
+                // If multiplayer and it's a player file, make sure it's for this player
+                if (gameMode === 'multiplayer' && update.type === 'PLAYER') {
+                    // Ensure player file has correct naming
+                    if (!update.fileName.includes('_')) {
+                        update.fileName = getPlayerFileName();
+                    }
+                }
+
+                if (update.operation === 'DELETE') {
+                    delete newFiles[update.fileName];
+                } else {
+                    newFiles[update.fileName] = {
+                        name: update.fileName,
+                        content: update.content,
+                        type: update.type,
+                        lastUpdated: gameState.worldTime + response.timeDelta,
+                        isHidden: update.isHidden ?? false,
+                    };
+                }
+            });
+
+            // Handle initial time setup
+            let newWorldTime = gameState.worldTime;
+            if (response.initialTime && gameState.worldTime === 0) {
+                newWorldTime = new Date(response.initialTime).getTime();
+            } else if (response.timeDelta) {
+                newWorldTime += response.timeDelta * 1000; // Convert seconds to ms
+            }
+
+            // Parse live updates
+            const parsedLiveUpdates: LiveUpdate[] = response.liveUpdates?.map(update => ({
+                id: simpleUuid(),
+                text: update,
+                type: update.startsWith('+') || update.includes('+')
+                    ? 'POSITIVE'
+                    : update.startsWith('-') || update.includes('-')
+                        ? 'NEGATIVE'
+                        : 'NEUTRAL',
+            })) || [];
+
+            // Add narrative to history
+            const narrativeEntry: LogEntry = {
+                id: simpleUuid(),
+                type: 'NARRATIVE',
+                text: response.narrative,
+                timestamp: Date.now(),
+            };
+
+            // Check for player death
+            const isDead = checkPlayerDeath(newFiles);
+
+            setGameState(prev => ({
+                ...prev,
+                isInitialized: true,
+                isLoading: false,
+                worldTime: newWorldTime,
+                files: newFiles,
+                history: [...prev.history, narrativeEntry],
+                liveUpdates: parsedLiveUpdates,
+                isPlayerDead: isDead,
+            }));
+
+            // If player died, delete their file
+            if (isDead && !gameState.isPlayerDead) {
+                const playerFileName = getPlayerFileName();
+                setGameState(prev => {
+                    const updatedFiles = { ...prev.files };
+                    delete updatedFiles[playerFileName];
+
+                    return {
+                        ...prev,
+                        files: updatedFiles,
+                        history: [
+                            ...prev.history,
+                            {
+                                id: simpleUuid(),
+                                type: 'ERROR',
+                                text: 'You died! Reset for a new adventure.',
+                                timestamp: Date.now(),
+                            },
+                        ],
+                    };
+                });
+            }
+
+            // Notify multiplayer turn complete
+            if (onTurnComplete) {
+                onTurnComplete();
+            }
+
+        } catch (error) {
+            console.error('Engine error:', error);
+            const errorEntry: LogEntry = {
+                id: simpleUuid(),
+                type: 'ERROR',
+                text: error instanceof Error ? error.message : 'Unknown error occurred',
+                timestamp: Date.now(),
+            };
+
+            setGameState(prev => ({
+                ...prev,
+                isLoading: false,
+                history: [...prev.history, errorEntry],
+            }));
+        } finally {
+            turnProcessingRef.current = false;
+        }
+    }, [gameState, gameMode, multiplayerUsername, onTurnComplete]);
+
+    const resetGame = useCallback(() => {
+        setGameState({
+            isInitialized: false,
+            isLoading: false,
+            debugMode: gameState.debugMode, // Preserve debug mode
+            worldTime: 0,
+            files: INITIAL_FILES,
+            history: [],
+            liveUpdates: [],
+            isPlayerDead: false,
+        });
+        setSelectedFile(null);
+    }, [gameState.debugMode]);
+
+    const toggleDebug = useCallback(() => {
+        setGameState(prev => ({
+            ...prev,
+            debugMode: !prev.debugMode,
+        }));
+    }, []);
+
+    const inspectItem = useCallback((ref: string) => {
+        // Extract file name from reference (format: [FileName])
+        const fileName = ref.replace(/[\[\]]/g, '');
+        setSelectedFile(fileName);
+    }, []);
+
+    return {
+        gameState,
+        handleInput,
+        resetGame,
+        toggleDebug,
+        inspectItem,
+        selectedFile,
+        setSelectedFile,
+        isPlayerDead: gameState.isPlayerDead,
+    };
 };

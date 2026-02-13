@@ -62,62 +62,80 @@ export const Terminal: React.FC<TerminalProps> = ({ history, isLoading, onRefere
   }, [history, isLoading]);
 
   const renderText = (text: string) => {
-    // Regex for local(player)[content]
-    // We need to handle this recursively or just specific blocks?
-    // The prompt says "text can be set like this local(player1)[blah blah]".
-    // It implies it could be embedded.
-
-    // We'll split by the local pattern first.
-    // Regex: /local\((.*?)\)\[(.*?)\]/g  <-- non-greedy match
+    // Handle both local(player)[content] and target(player1, player2[content]) syntax
+    // First, we'll parse for both patterns
 
     const parts = [];
     let lastIndex = 0;
-    const regex = /local\((.*?)\)\[(.*?)\]/g;
-    let match;
 
-    while ((match = regex.exec(text)) !== null) {
+    // Combined regex for both local() and target()
+    // local(player)[content] or target(player1, player2[content])
+    const localRegex = /local\((.*?)\)\[(.*?)\]/g;
+    const targetRegex = /target\((.*?)\[(.*?)\]\)/g;
+
+    // We need to find all matches and sort them by position
+    const matches: Array<{ index: number; type: 'local' | 'target'; target: string; content: string }> = [];
+
+    let match;
+    while ((match = localRegex.exec(text)) !== null) {
+      matches.push({
+        index: match.index,
+        type: 'local',
+        target: match[1],
+        content: match[2],
+      });
+    }
+
+    while ((match = targetRegex.exec(text)) !== null) {
+      matches.push({
+        index: match.index,
+        type: 'target',
+        target: match[1],
+        content: match[2],
+      });
+    }
+
+    // Sort by index
+    matches.sort((a, b) => a.index - b.index);
+
+    // Build parts array
+    lastIndex = 0;
+    matches.forEach((m) => {
       // Add text before match
-      if (match.index > lastIndex) {
-        parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+      if (m.index > lastIndex) {
+        const matchLength = m.type === 'local'
+          ? `local(${m.target})[${m.content}]`.length
+          : `target(${m.target}[${m.content}])`.length;
+        parts.push({ type: 'text', content: text.substring(lastIndex, m.index) });
+        lastIndex = m.index + matchLength;
       }
 
-      const targetPlayer = match[1];
-      const content = match[2];
-
-      // Check availability
-      // We need userId passed in props. 
-      // If no userId prop, we assume we see everything (or nothing? likely nothing if it's private)
-      // Actually, if we are the DM/Host maybe we see all? 
-      // For now, let's just match exact ID or 'all' maybe?
-
-      parts.push({ type: 'local', target: targetPlayer, content: content });
-
-      lastIndex = regex.lastIndex;
-    }
+      parts.push({
+        type: m.type,
+        target: m.target,
+        content: m.content,
+      });
+    });
 
     if (lastIndex < text.length) {
       parts.push({ type: 'text', content: text.substring(lastIndex) });
     }
 
     return parts.map((part, index) => {
-      if (part.type === 'local') {
-        // If we don't have a user ID, we probably shouldn't see private messages unless we are debugging.
-        // But let's assume valid auth mapping.
-        // We need to pass `userId` to Terminal.
-        return (
-          <span key={index} className="local-message-container">
-            {/* We will filter this in the render return or here. 
-                        Since we can't conditionally return nothing easily in map without fragment,
-                        we'll handle visibility logic in a wrapper or just return null. 
-                    */}
-            <LocalMessage
-              target={part.target!}
-              content={part.content!}
-              userId={userId}
-              onReferenceClick={onReferenceClick}
-            />
-          </span>
-        );
+      if (part.type === 'local' || part.type === 'target') {
+        // Check if current user should see this content
+        // For target(), it's a comma-separated list of usernames
+        const targetList = part.target!.split(',').map(t => t.trim());
+        const canSee = userId && targetList.includes(userId);
+
+        if (canSee) {
+          return (
+            <span key={index} className="text-terminal-cyan/80 italic">
+              {processInspectables(part.content!, onReferenceClick)}
+            </span>
+          );
+        }
+        return null;
       }
 
       // Standard text processing (inspectable items)
