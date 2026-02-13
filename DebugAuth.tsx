@@ -49,10 +49,14 @@ export const DebugAuth: React.FC = () => {
     const testGoogleSignIn = async () => {
         setStatus(prev => [...prev, '', 'Attempting Google sign in...']);
         try {
+            // Support both localhost and production deployment
+            const redirectUrl = window.location.origin;
+            setStatus(prev => [...prev, `Using redirect URL: ${redirectUrl}`]);
+
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    redirectTo: redirectUrl,
                 },
             });
 

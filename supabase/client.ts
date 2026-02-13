@@ -26,10 +26,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Helper functions for authentication
 export const signInWithGoogle = async () => {
     console.log('Initiating Google sign in...');
+
+    // Support both localhost and production deployment
+    const redirectUrl = window.location.origin;
+    console.log('OAuth redirect URL:', redirectUrl);
+
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            redirectTo: window.location.origin,
+            redirectTo: redirectUrl,
         },
     });
 
