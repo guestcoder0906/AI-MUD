@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://pxdovjbwktuaaolzjijd.supabase.co';
-const supabaseAnonKey = 'sb_publishable_iAxQdLMtg8z2MvNsQPuhxQ_XIGqQGQe';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pxdovjbwktuaaolzjijd.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_KEY || 'sb_publishable_iAxQdLMtg8z2MvNsQPuhxQ_XIGqQGQe';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
         // Persist session across page reloads
         persistSession: true,

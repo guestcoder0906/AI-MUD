@@ -43,6 +43,7 @@ const App: React.FC = () => {
     kickPlayer,
     forceNextTurn,
     markTurnSubmitted,
+    isLoading: isMultiplayerLoading,
   } = useMultiplayer(user);
 
   const {
@@ -75,7 +76,7 @@ const App: React.FC = () => {
     if (currentGame && gameMode !== 'multiplayer') {
       console.log('Current game detected, setting mode to multiplayer');
       setGameMode('multiplayer');
-    } else if (!currentGame && gameMode === 'multiplayer') {
+    } else if (!currentGame && gameMode === 'multiplayer' && !isMultiplayerLoading) {
       console.log('No current game, resetting mode');
       setGameMode(null);
     }
@@ -143,9 +144,8 @@ const App: React.FC = () => {
       // Host game
       const result = await createGame();
       if (result.success) {
-        setGameMode('multiplayer');
-        // Force update to ensure UI shows multiplayer
-        setTimeout(() => setGameMode('multiplayer'), 100);
+        // Let useEffect handle setting game mode to avoid race conditions
+        // setGameMode('multiplayer');
       } else {
         alert(result.error || 'Failed to create game');
       }
@@ -158,10 +158,9 @@ const App: React.FC = () => {
   const handleJoinGame = async (code: string) => {
     const result = await joinGame(code);
     if (result.success) {
-      setGameMode('multiplayer');
+      // Let useEffect handle setting game mode
+      // setGameMode('multiplayer');
       setShowJoinModal(false);
-      // Force update to ensure UI reflects join
-      setTimeout(() => setGameMode('multiplayer'), 100);
       return { success: true };
     }
     return { success: false, error: result.error };
