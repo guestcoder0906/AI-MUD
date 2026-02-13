@@ -80,7 +80,7 @@ const App: React.FC = () => {
       console.log('No current game, resetting mode');
       setGameMode(null);
     }
-  }, [currentGame]);
+  }, [currentGame, isMultiplayerLoading]);
 
   // Check for API Key presence
   useEffect(() => {

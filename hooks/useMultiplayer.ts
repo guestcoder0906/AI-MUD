@@ -142,8 +142,6 @@ export const useMultiplayer = (user: User | null): UseMultiplayerReturn => {
         if (!error && data) {
             console.log('Players loaded:', data.length, 'players');
             setPlayers(data);
-            // Force re-render
-            setTimeout(() => setPlayers(data), 50);
         } else {
             console.error('Error loading players:', error);
         }
@@ -249,12 +247,6 @@ export const useMultiplayer = (user: User | null): UseMultiplayerReturn => {
             setCurrentGame(game);
             setIsHost(true);
 
-            // Force a re-render
-            setTimeout(() => {
-                setCurrentGame(game);
-                setIsHost(true);
-            }, 100);
-
             return { success: true };
         } catch (error) {
             console.error('Error creating game:', error);
@@ -350,12 +342,6 @@ export const useMultiplayer = (user: User | null): UseMultiplayerReturn => {
 
             setCurrentGame(game);
             setIsHost(game.host_user_id === user.id);
-
-            // Force a re-render to ensure UI updates
-            setTimeout(() => {
-                setCurrentGame(game);
-                setIsHost(game.host_user_id === user.id);
-            }, 100);
 
             console.log('Successfully joined game:', game.code);
             return { success: true };
