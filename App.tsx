@@ -169,6 +169,7 @@ const App: React.FC = () => {
   // Handle leaving game - reload page after leaving
   const handleLeaveGame = async () => {
     await leaveGame();
+    resetGame();
     // Reload page to reset state
     window.location.reload();
   };
