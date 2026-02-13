@@ -200,6 +200,7 @@ const App: React.FC = () => {
           onSignIn={signIn}
           onSignOut={signOut}
           user={user}
+          isLoading={isMultiplayerLoading}
         />
         <JoinGameModal
           isOpen={showJoinModal}

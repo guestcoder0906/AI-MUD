@@ -183,17 +183,22 @@ export const useAuth = (): UseAuthReturn => {
     const handleSignOut = async () => {
         console.log('🚪 Logging out user...');
         setIsLoading(true);
+
+        // Optimistically clear local state immediately
         try {
-            await signOut();
             localStorage.removeItem('user_profile');
             setUser(null);
             setSupabaseUser(null);
             setNeedsUsername(false);
+
+            // Attempt network sign out but don't block
+            await signOut();
             console.log('✅ Logout successful');
         } catch (error) {
             console.error('❌ Error signing out:', error);
         } finally {
             setIsLoading(false);
+            window.location.reload();
         }
     };
 

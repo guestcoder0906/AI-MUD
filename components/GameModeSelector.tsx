@@ -7,6 +7,7 @@ interface GameModeSelectorProps {
     onSignIn: () => void;
     onSignOut: () => void;
     user: User | null;
+    isLoading?: boolean;
 }
 
 export const GameModeSelector: React.FC<GameModeSelectorProps> = ({
@@ -15,6 +16,7 @@ export const GameModeSelector: React.FC<GameModeSelectorProps> = ({
     onSignIn,
     onSignOut,
     user,
+    isLoading = false,
 }) => {
     return (
         <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-terminal-black to-[#050505]">
@@ -61,24 +63,29 @@ export const GameModeSelector: React.FC<GameModeSelectorProps> = ({
                     {/* Host Multiplayer */}
                     <button
                         onClick={() => isAuthenticated ? onSelectMode('multiplayer') : onSignIn()}
-                        className="group bg-terminal-gray/10 hover:bg-terminal-amber/10 border-2 border-terminal-gray hover:border-terminal-amber p-8 rounded-lg transition-all duration-300 text-left"
+                        disabled={isLoading}
+                        className={`group bg-terminal-gray/10 hover:bg-terminal-amber/10 border-2 border-terminal-gray hover:border-terminal-amber p-8 rounded-lg transition-all duration-300 text-left ${isLoading ? 'opacity-50 cursor-wait' : ''}`}
                     >
                         <div className="flex items-start justify-between">
                             <div className="flex-1">
                                 <h3 className="text-2xl font-bold text-terminal-amber mb-2 group-hover:text-terminal-amber tracking-wide">
-                                    HOST MULTIPLAYER
+                                    {isLoading ? 'CREATING...' : 'HOST MULTIPLAYER'}
                                 </h3>
                                 <p className="text-terminal-lightGray text-sm mb-3">
-                                    Create a shared world. Get a code to invite others.
+                                    {isLoading ? 'Establishing quantum link...' : 'Create a shared world. Get a code to invite others.'}
                                 </p>
                                 <div className="flex items-center space-x-2 text-xs text-terminal-gray">
                                     <span className="px-2 py-1 bg-terminal-amber/20 rounded border border-terminal-amber/50">ONLINE</span>
                                     {!isAuthenticated && <span className="px-2 py-1 bg-red-900/20 rounded border border-red-500 text-red-400">LOGIN REQUIRED</span>}
                                 </div>
                             </div>
-                            <svg className="w-8 h-8 text-terminal-amber opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
+                            {isLoading ? (
+                                <div className="w-8 h-8 rounded-full border-2 border-terminal-amber border-t-transparent animate-spin"></div>
+                            ) : (
+                                <svg className="w-8 h-8 text-terminal-amber opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            )}
                         </div>
                     </button>
 
